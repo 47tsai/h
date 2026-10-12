@@ -131,6 +131,11 @@
     }
     const timestamp = Date.now();
     const normalizedUrl = parsedUrl.href;
+    const conflictingFavorite = favorites.find((item) => item.url === normalizedUrl && item.id !== editingFavoriteId);
+    if (editingFavoriteId && conflictingFavorite) {
+      storageError = '這個網址已存在於另一筆收藏，請先取消另一筆收藏或改用不同網址。';
+      return;
+    }
     const existing = favorites.find((item) => item.id === editingFavoriteId) ?? favorites.find((item) => item.url === normalizedUrl);
     const item: FavoriteItem = {
       id: existing?.id ?? crypto.randomUUID(),
