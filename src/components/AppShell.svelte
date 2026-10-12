@@ -323,8 +323,8 @@
 
 <div class="app-frame">
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><span><strong>H Tools</strong><small>PERSONAL WORKSPACE</small></span></a>
-    <div class="nav-label">工作區</div>
+    <a class="brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><span><strong>H Tools</strong></span></a>
+    
     <nav aria-label="主要導覽">
       {#each navigation as item}
         <button class:active={activeSection === item.id} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
@@ -334,24 +334,24 @@
       {/each}
     </nav>
     <div class="sidebar-bottom">
-      <div class="local-status"><span class="status-dot"></span><span><strong>本機模式</strong><small>資料保存在此裝置</small></span></div>
+      <div class="local-status"><span class="status-dot"></span><span><strong>本機模式</strong></span></div>
       <div class="sidebar-foot">H TOOLS <span>·</span> 0.1.0</div>
     </div>
   </aside>
 
   <main class="main-area">
     <header class="topbar">
-      <div class="breadcrumb"><span>Workspace</span><span class="slash">/</span><strong>{navigation.find((item) => item.id === activeSection)?.hint}</strong></div>
-      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span>僅本機儲存</span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}>⚙</button></div>
+      
+      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}>⚙</button></div>
     </header>
 
     <div class="content">
       {#if activeSection === 'stopwatch'}
-        <section class="page-heading"><div><div class="eyebrow">TIME TRACKING</div><h1>純碼錶</h1><p>不打擾節奏，只把經過的時間記下來。</p></div><div class="heading-chip"><span class="pulse"></span>本機紀錄</div></section>
+        <section class="page-heading"><h1>純碼錶</h1></section>
         <section class="stopwatch-card">
-          <div class="card-topline"><span class="live-indicator"></span><span>{runningState?.running ? 'STOPWATCH RUNNING' : runningState ? 'STOPWATCH PAUSED' : 'READY WHEN YOU ARE'}</span><span class="card-topline-right">LOCAL SESSION</span></div>
+          <div class="card-topline"><span class="live-indicator"></span><span>{runningState?.running ? '計時中' : runningState ? '已暫停' : '準備就緒'}</span></div>
           <div class="timer-display" aria-live="off">{elapsedLabel}<span class="timer-hundredths">.{String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0')}</span></div>
-          <div class="timer-caption">{runningState ? '開始時間 ' + makeTitle(runningState.sessionStartedAt) : '準備好時，按下開始即可'}</div>
+          <div class="timer-caption">{#if runningState}{makeTitle(runningState.sessionStartedAt)}{/if}</div>
           <div class="timer-controls">
             {#if !runningState}
               <button class="primary-button" onclick={startStopwatch}><span>▶</span> 開始計時</button>
@@ -361,13 +361,13 @@
               <button class="secondary-button" onclick={resumeStopwatch}>▶ 繼續</button><button class="primary-button" onclick={stopStopwatch}>■ 停止並儲存</button>
             {/if}
           </div>
-          <div class="card-footnote"><span>◈</span> 依時間戳計算，離開頁面或重新開啟後仍可恢復</div>
+          
         </section>
         <section class="records-section">
-          <div class="section-heading"><div><h2>最近紀錄</h2><p>紀錄只存在目前瀏覽器的本機資料庫</p></div><span class="count-pill">{records.length} 筆</span></div>
+          <div class="section-heading"><h2>最近紀錄</h2><span class="count-pill">{records.length} 筆</span></div>
           <div class="record-list">
             {#if records.length === 0}
-              <div class="empty-state"><div class="empty-icon">◷</div><strong>還沒有碼錶紀錄</strong><span>完成第一次計時後，紀錄就會出現在這裡。</span></div>
+              <div class="empty-state"><div class="empty-icon">◷</div><strong>尚無紀錄</strong></div>
             {:else}
               {#each records.slice(0, 5) as record (record.id)}
                 <article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>{new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>
@@ -377,18 +377,18 @@
           </div>
         </section>
       {:else if activeSection === 'settings'}
-        <section class="page-heading"><div><div class="eyebrow">PREFERENCES</div><h1>設定</h1><p>調整介面偏好與本機資料行為。</p></div></section>
+        <section class="page-heading"><h1>設定</h1></section>
         <section class="settings-card">
-          <div class="setting-row"><div><strong>介面主題</strong><p>系統模式會跟隨裝置的外觀設定。</p></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
-          <div class="setting-row"><div><strong>資料保存</strong><p>碼錶紀錄使用 IndexedDB；進行中的計時狀態保存在本機瀏覽器。</p></div><span class="setting-badge">LOCAL FIRST</span></div>
-          <div class="setting-row"><div><strong>雲端同步</strong><p>同步功能尚未啟用。完成 Worker 與安全驗證後才會加入手動同步。</p></div><span class="setting-badge muted">尚未設定</span></div>
+          <div class="setting-row"><div><strong>介面主題</strong></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
+          <div class="setting-row"><div><strong>資料保存</strong><p>儲存於此裝置的瀏覽器。</p></div></div>
+          <div class="setting-row"><div><strong>雲端同步</strong></div><span class="setting-badge muted">尚未啟用</span></div>
         </section>
       {:else if activeSection === 'history'}
-        <section class="page-heading"><div><div class="eyebrow">YOUR ACTIVITY</div><h1>歷史紀錄</h1><p>搜尋與管理本機保存的碼錶紀錄。</p></div></section>
+        <section class="page-heading"><h1>歷史紀錄</h1></section>
         <section class="history-stats" aria-label="碼錶統計">
-          <article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong><small>筆紀錄</small></article>
-          <article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong><small>依結束日期統計</small></article>
-          <article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong><small>{records.length} 筆紀錄</small></article>
+          <article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong></article>
+          <article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong></article>
+          <article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong></article>
         </section>
         <section class="records-section full-records">
           <div class="history-toolbar">
@@ -402,7 +402,7 @@
               </select>
             </label>
           </div>
-          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">⌕</div><strong>{records.length ? '沒有符合的紀錄' : '目前沒有紀錄'}</strong><span>{records.length ? '試試其他關鍵字。' : '完成一次碼錶計時後，紀錄會出現在這裡。'}</span></div>
+          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">⌕</div><strong>{records.length ? '沒有符合的紀錄' : '目前沒有紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '開始計時後會顯示在這裡'}</span></div>
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
@@ -461,9 +461,9 @@
           </div>
         </section>
       {:else}
-        <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
+        <section class="page-heading"><h1>我的收藏</h1><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
-          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
+          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2></div></div>
           <form class="favorite-form" onsubmit={(event) => { event.preventDefault(); void addFavorite(); }}>
             <label>網址 <input bind:value={favoriteUrl} type="url" required placeholder="https://example.com/page" /></label>
             <label>標題 <input bind:value={favoriteTitle} placeholder="留空時使用網站網域" /></label>
@@ -474,7 +474,7 @@
         <section class="records-section full-records">
           <div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label><label class="sort-field">排序<select bind:value={favoriteSort} aria-label="收藏排序"><option value="newest">最近加入</option><option value="oldest">最早加入</option><option value="updated">最近更新</option><option value="title">標題 A 到 Z</option></select></label></div>
           {#if filteredFavorites.length === 0}
-            <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字。' : '使用上方表單保存常用網址。'}</span></div>
+            <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字' : '新增網址即可收藏'}</span></div>
           {:else}
             <div class="favorite-list">{#each filteredFavorites as item (item.id)}
               <article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}>✎</button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>
@@ -485,7 +485,7 @@
 
       {#if storageError}<div class="toast error" role="alert">{storageError}</div>{/if}
       {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}>×</button></div>{/if}
-      <footer class="page-footer"><span>H TOOLS</span><span>本機優先 · 隱私優先 · 逐步實作</span></footer>
+      
     </div>
   </main>
 </div>
