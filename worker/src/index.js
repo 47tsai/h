@@ -112,7 +112,7 @@ function validateDocument(doc) {
   if (doc.stopwatchRecords.some((item) => tombstoneKeys.has('stopwatchRecords:' + item.id))
     || doc.resultHistory.some((item) => tombstoneKeys.has('resultHistory:' + item.id))
     || doc.favorites.some((item) => tombstoneKeys.has('favorites:' + item.id))) return false;
-  const settings = doc.settings ?? {};
+  const settings = doc.settings;
   if (!isPlainObject(settings) || Object.keys(settings).some((key) => key !== 'theme')
     || (settings.theme !== undefined && !['system', 'light', 'dark'].includes(settings.theme))) return false;
   return true;
