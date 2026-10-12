@@ -3,15 +3,16 @@
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
   import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
   import { convertInput } from '../lib/converter';
+  import Icon from './Icon.svelte';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
   const navigation: { id: Section; label: string; icon: string; hint: string }[] = [
-    { id: 'converter', label: '編號轉換', icon: '↗', hint: 'Converter' },
-    { id: 'history', label: '歷史紀錄', icon: '◷', hint: 'History' },
-    { id: 'favorites', label: '我的收藏', icon: '☆', hint: 'Favorites' },
-    { id: 'stopwatch', label: '碼錶', icon: '◴', hint: 'Stopwatch' },
-    { id: 'settings', label: '設定', icon: '⚙', hint: 'Settings' },
+    { id: 'converter', label: '編號轉換', icon: 'arrow-up-right', hint: 'Converter' },
+    { id: 'history', label: '歷史紀錄', icon: 'history', hint: 'History' },
+    { id: 'favorites', label: '我的收藏', icon: 'star', hint: 'Favorites' },
+    { id: 'stopwatch', label: '碼錶', icon: 'timer', hint: 'Stopwatch' },
+    { id: 'settings', label: '設定', icon: 'settings', hint: 'Settings' },
   ];
 
   let activeSection: Section = 'converter';
@@ -379,7 +380,7 @@
     <nav aria-label="主要導覽">
       {#each navigation as item}
         <button class:active={activeSection === item.id} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
-          <span class="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
+          <span class="nav-icon" aria-hidden="true"><Icon name={item.icon} size={20} /></span><span>{item.label}</span>
           {#if activeSection === item.id}<span class="nav-dot"></span>{/if}
         </button>
       {/each}
@@ -393,7 +394,7 @@
   <main class="main-area">
     <header class="topbar">
       
-      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}>⚙</button></div>
+      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}><Icon name="settings" size={18} /></button></div>
     </header>
 
     <div class="content">
@@ -405,20 +406,20 @@
           <div class="timer-caption">{#if runningState}{makeTitle(runningState.sessionStartedAt)}{/if}</div>
           <div class="timer-controls">
             {#if !runningState}
-              <button class="primary-button" onclick={startStopwatch}><span>▶</span> 開始計時</button>
+              <button class="primary-button" onclick={startStopwatch}><Icon name="play" size={16} /> 開始計時</button>
             {:else if runningState.running}
-              <button class="secondary-button" onclick={pauseStopwatch}>Ⅱ 暫停</button><button class="primary-button" onclick={stopStopwatch}>■ 停止並儲存</button>
+              <button class="secondary-button" onclick={pauseStopwatch}><Icon name="pause" size={16} /> 暫停</button><button class="primary-button" onclick={stopStopwatch}><Icon name="square" size={15} /> 停止並儲存</button>
             {:else}
-              <button class="secondary-button" onclick={resumeStopwatch}>▶ 繼續</button><button class="primary-button" onclick={stopStopwatch}>■ 停止並儲存</button>
+              <button class="secondary-button" onclick={resumeStopwatch}><Icon name="play" size={16} /> 繼續</button><button class="primary-button" onclick={stopStopwatch}><Icon name="square" size={15} /> 停止並儲存</button>
             {/if}
           </div>
           
         </section>
         <section class="history-stats" aria-label="碼錶統計"><article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong></article><article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong></article><article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong></article></section>
         <section class="records-section full-records"><div class="section-heading"><h2>計時紀錄</h2><span class="count-pill">{records.length} 筆</span></div>
-          <div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋計時紀錄…" aria-label="搜尋計時紀錄" /></label><label class="sort-field">排序<select bind:value={recordSort} aria-label="計時紀錄排序"><option value="newest">最新優先</option><option value="oldest">最舊優先</option><option value="longest">時間最長</option><option value="shortest">時間最短</option></select></label></div>
-          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">◷</div><strong>{records.length ? '沒有符合的紀錄' : '尚無計時紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '停止並儲存碼錶後，紀錄會顯示在這裡'}</span></div>
-          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
+          <div class="history-toolbar"><label class="search-field"><span><Icon name="search" size={17} /></span><input bind:value={recordQuery} placeholder="搜尋計時紀錄…" aria-label="搜尋計時紀錄" /></label><label class="sort-field">排序<select bind:value={recordSort} aria-label="計時紀錄排序"><option value="newest">最新優先</option><option value="oldest">最舊優先</option><option value="longest">時間最長</option><option value="shortest">時間最短</option></select></label></div>
+          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon"><Icon name="history" size={24} /></div><strong>{records.length ? '沒有符合的紀錄' : '尚無計時紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '停止並儲存碼錶後，紀錄會顯示在這裡'}</span></div>
+          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol"><Icon name="timer" size={20} /></div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}><Icon name="trash" size={16} /></button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'settings'}
         <section class="page-heading"><h1>設定</h1></section>
@@ -429,9 +430,9 @@
         </section>
       {:else if activeSection === 'history'}
         <section class="page-heading"><div><h1>歷史紀錄</h1><p>開啟、複製或分享過的結果會自動整理在這裡。</p></div><span class="count-pill">{resultHistory.length} 筆</span></section>
-        <section class="records-section full-records"><div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={resultQuery} placeholder="搜尋網址或來源站…" aria-label="搜尋結果歷史紀錄" /></label><label class="sort-field">排序<select bind:value={resultSort} aria-label="歷史紀錄排序"><option value="newest">最近操作</option><option value="oldest">最早操作</option></select></label></div>
-          {#if filteredResultHistory.length === 0}<div class="record-list empty-state"><div class="empty-icon">◷</div><strong>{resultHistory.length ? '沒有符合的紀錄' : '目前沒有歷史紀錄'}</strong><span>{resultHistory.length ? '試試其他關鍵字' : '開啟、複製或分享轉換結果後，就會自動記錄在這裡'}</span></div>
-          {:else}<div class="favorite-list">{#each filteredResultHistory as item (item.id)}<article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.sourceLabel}</strong><a href={item.url} target="_blank" rel="noopener noreferrer" onclick={() => void logResultAction({key:item.source,label:item.sourceLabel,url:item.url}, 'open')}>{item.url}</a><small>最後操作：{actionLabel(item.lastAction)} · {new Date(item.lastActionAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} title={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} onclick={() => toggleHistoryFavorite(item)}>{favorites.some((favorite) => favorite.url === item.url) ? '★' : '☆'}</button><button class="open-favorite" aria-label="複製網址" title="複製網址" onclick={() => void copyResult({key:item.source,label:item.sourceLabel,url:item.url})}>⧉</button><button class="delete-button" aria-label="刪除歷史紀錄" title="刪除紀錄" onclick={() => removeHistoryItem(item.id)}>×</button></article>{/each}</div>{/if}
+        <section class="records-section full-records"><div class="history-toolbar"><label class="search-field"><span><Icon name="search" size={17} /></span><input bind:value={resultQuery} placeholder="搜尋網址或來源站…" aria-label="搜尋結果歷史紀錄" /></label><label class="sort-field">排序<select bind:value={resultSort} aria-label="歷史紀錄排序"><option value="newest">最近操作</option><option value="oldest">最早操作</option></select></label></div>
+          {#if filteredResultHistory.length === 0}<div class="record-list empty-state"><div class="empty-icon"><Icon name="history" size={24} /></div><strong>{resultHistory.length ? '沒有符合的紀錄' : '目前沒有歷史紀錄'}</strong><span>{resultHistory.length ? '試試其他關鍵字' : '開啟、複製或分享轉換結果後，就會自動記錄在這裡'}</span></div>
+          {:else}<div class="favorite-list">{#each filteredResultHistory as item (item.id)}<article class="favorite-row"><div class="record-symbol"><Icon name="external-link" size={20} /></div><div class="record-info"><strong>{item.sourceLabel}</strong><a href={item.url} target="_blank" rel="noopener noreferrer" onclick={() => void logResultAction({key:item.source,label:item.sourceLabel,url:item.url}, 'open')}>{item.url}</a><small>最後操作：{actionLabel(item.lastAction)} · {new Date(item.lastActionAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} title={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} onclick={() => toggleHistoryFavorite(item)}>{#if favorites.some((favorite) => favorite.url === item.url)}<Icon name="star-filled" size={17} />{:else}<Icon name="star" size={17} />{/if}</button><button class="open-favorite" aria-label="複製網址" title="複製網址" onclick={() => void copyResult({key:item.source,label:item.sourceLabel,url:item.url})}><Icon name="copy" size={16} /></button><button class="delete-button" aria-label="刪除歷史紀錄" title="刪除紀錄" onclick={() => removeHistoryItem(item.id)}><Icon name="trash" size={16} /></button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
         <section class="page-heading"><h1>編號轉換</h1></section>
@@ -450,9 +451,9 @@
             <div class="converter-input-wrap">
               <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }} placeholder="輸入編號或文字" aria-label="作品編號或文字" />
               <div class="converter-input-actions">
-                <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /><path d="M16 4h2a2 2 0 0 1 2 2v4" /><path d="M21 14h-7" /><path d="m17 10-4 4 4 4" /></svg></button>
-                <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}>×</button>
-                {#if converterSite !== 'M' && converterSite !== 'J'}<button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>{/if}
+                <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}><Icon name="paste" size={18} /></button>
+                <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}><Icon name="x" size={18} /></button>
+                {#if converterSite !== 'M' && converterSite !== 'J'}<button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}><Icon name="shuffle" size={18} /></button>{/if}
               </div>
             </div>
             
@@ -466,9 +467,9 @@
                     <div class="converter-multi-heading">{result.label}</div>
                     <div class="converter-multi-url">{result.url}</div>
                     <div class="converter-multi-actions">
-                      <button class="secondary-button" onclick={() => void openResult(result)}>↗ 開啟</button>
-                      <button class="secondary-button" onclick={() => void copyResult(result)}><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg> 複製</button>
-                      <button class="secondary-button" onclick={() => void shareResult(result)}>↗ 分享</button>
+                      <button class="secondary-button" onclick={() => void openResult(result)}><Icon name="external-link" size={15} /> 開啟</button>
+                      <button class="secondary-button" onclick={() => void copyResult(result)}><Icon name="copy" size={15} /> 複製</button>
+                      <button class="secondary-button" onclick={() => void shareResult(result)}><Icon name="share" size={15} /> 分享</button>
                     </div>
                   </div>
                 {/each}
@@ -477,12 +478,12 @@
               <div class="converter-output-row">
                 <div class="converter-output-text" aria-live="polite">{converterOutput || '轉換結果'}</div>
                 <div class="converter-output-actions">
-                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg></button>
-                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
+                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}><Icon name="copy" size={18} /></button>
+                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}><Icon name="share" size={18} /></button>
                 </div>
               </div>
               <div class="converter-result-actions">
-                <button class="secondary-button" disabled={!converterUrl} onclick={() => { const result = converterResults[0]; if (result) void openResult(result); }}>↗ 開啟</button>
+                <button class="secondary-button" disabled={!converterUrl} onclick={() => { const result = converterResults[0]; if (result) void openResult(result); }}><Icon name="external-link" size={15} /> 開啟</button>
               </div>
             {/if}
           </div>
@@ -490,7 +491,7 @@
       {:else}
         <section class="page-heading"><div><h1>我的收藏</h1><p>依來源站分類整理，星號可從歷史紀錄快速加入或移除。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
-          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2></div></div>
+          <div class="editor-heading"><div class="placeholder-icon"><Icon name="star" size={22} /></div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2></div></div>
           <form class="favorite-form" onsubmit={(event) => { event.preventDefault(); void addFavorite(); }}>
             <label>網址 <input bind:value={favoriteUrl} type="url" required placeholder="https://example.com/page" /></label>
             <label>標題 <input bind:value={favoriteTitle} placeholder="留空時使用網站網域" /></label>
@@ -499,17 +500,17 @@
           </form>
         </section>
         <section class="records-section full-records">
-          <div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label><label class="sort-field">排序<select bind:value={favoriteSort} aria-label="收藏排序"><option value="newest">最近加入</option><option value="oldest">最早加入</option><option value="updated">最近更新</option><option value="title">標題 A 到 Z</option></select></label></div>
+          <div class="history-toolbar"><label class="search-field"><span><Icon name="search" size={17} /></span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label><label class="sort-field">排序<select bind:value={favoriteSort} aria-label="收藏排序"><option value="newest">最近加入</option><option value="oldest">最早加入</option><option value="updated">最近更新</option><option value="title">標題 A 到 Z</option></select></label></div>
           {#if filteredFavorites.length === 0}
-            <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字' : '新增網址即可收藏'}</span></div>
+            <div class="record-list empty-state"><div class="empty-icon"><Icon name="star" size={24} /></div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字' : '新增網址即可收藏'}</span></div>
           {:else}
-            {#each favoriteGroups as group (group.label)}<section class="favorite-group"><div class="section-heading"><h2>{group.label}</h2><span class="count-pill">{group.items.length} 筆</span></div><div class="favorite-list">{#each group.items as item (item.id)}<article class="favorite-row"><div class="record-symbol">★</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}>✎</button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>{/each}</div></section>{/each}
+            {#each favoriteGroups as group (group.label)}<section class="favorite-group"><div class="section-heading"><h2>{group.label}</h2><span class="count-pill">{group.items.length} 筆</span></div><div class="favorite-list">{#each group.items as item (item.id)}<article class="favorite-row"><div class="record-symbol"><Icon name="star-filled" size={20} /></div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}><Icon name="pencil" size={16} /></button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟"><Icon name="external-link" size={16} /></a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}><Icon name="trash" size={16} /></button></article>{/each}</div></section>{/each}
           {/if}
         </section>
       {/if}
 
       {#if storageError}<div class="toast error" role="alert">{storageError}</div>{/if}
-      {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}>×</button></div>{/if}
+      {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}><Icon name="x" size={16} /></button></div>{/if}
       
     </div>
   </main>
