@@ -282,7 +282,45 @@ export default {
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    if (!await verifyPassword(payload.password, env.SYNC_PASSWORD_HASH)) {
+    const passwordHash = env.SYNC_PASSWORD_HASH;
+    if (typeof passwordHash !== 'string' || !passwordHash) {
+      return fail('PASSWORD_CONFIG_MISSING', 500, allowedOrigin);
+    }
+    const hashParts = passwordHash.split('
+    if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
+    if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
+
+    let local = payload.document;
+    try {
+      for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+        const remote = await githubRequest(env, 'GET');
+        const merged = mergeDocuments(local, remote.document);
+        if (!validateDocument(merged)) return fail('BAD_REQUEST', 400, allowedOrigin);
+        if (new TextEncoder().encode(JSON.stringify(merged)).byteLength > MAX_BODY_BYTES) {
+          return fail('PAYLOAD_TOO_LARGE', 413, allowedOrigin);
+        }
+        try {
+          const saved = await githubRequest(env, 'PUT', merged, remote.sha);
+          return json({ ok: true, document: merged, sha: saved.sha, syncedAt: new Date().toISOString() }, 200, allowedOrigin);
+        } catch (error) {
+          if (error?.message !== 'GITHUB_CONFLICT' || attempt === MAX_RETRIES - 1) throw error;
+          local = merged;
+        }
+      }
+      return fail('SYNC_CONFLICT', 409, allowedOrigin);
+    } catch (error) {
+      const [code, status] = clientError(error);
+      return fail(code, status, allowedOrigin);
+    }
+  },
+};
+);
+    if (hashParts.length !== 4 || hashParts[0] !== 'pbkdf2-sha256'
+      || !Number.isInteger(Number(hashParts[1])) || Number(hashParts[1]) < 100000
+      || Number(hashParts[1]) > 1000000 || !hashParts[2] || !hashParts[3]) {
+      return fail('PASSWORD_CONFIG_INVALID', 500, allowedOrigin);
+    }
+    if (!await verifyPassword(payload.password, passwordHash)) {
       return fail('AUTH_FAILED', 401, allowedOrigin);
     }
     if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
