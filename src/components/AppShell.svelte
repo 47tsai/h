@@ -631,7 +631,7 @@
           <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">{syncWorkerUrl ? (lastSyncedAt ? '已連接' : '待同步') : '未設定'}</span></div>
           {#if syncWorkerUrl}
             <form class="sync-controls" onsubmit={(event) => { event.preventDefault(); void runCloudSync(); }}>
-              <input type="password" bind:value={syncPassword} autocomplete="current-password" placeholder="同步密碼" aria-label="同步密碼" />
+              <input type="password" bind:value={syncPassword} autocomplete="off" placeholder="同步密碼" aria-label="同步密碼" />
               <button class="secondary-button" type="submit" disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
             </form>
           {:else}
