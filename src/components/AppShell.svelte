@@ -40,7 +40,7 @@
   const converterSources: Record<string, { label: string; domain: string; buildUrl?: (id: string) => string }> = {
     N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
     W: { label: 'W 站', domain: 'w.com', buildUrl: (id) => `https://www.w.com/photos-slide-aid-${id}.html` },
-    JM: { label: 'JM 站', domain: 'jm.com' },
+    JM: { label: 'JM 站', domain: 'jm.com', buildUrl: (id) => `https://jm.com/photo/${id}` },
     P: { label: 'P 站', domain: 'p.com' },
   };
 
