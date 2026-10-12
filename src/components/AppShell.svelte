@@ -36,6 +36,7 @@
   let converterOutput = '';
   let converterUrl = '';
   let converterUrls: string[] = [];
+  let converterResults: { key: string; label: string; url: string }[] = [];
 
   const converterSources: Record<string, { label: string; domain: string; buildUrl?: (id: string) => string }> = {
     N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
@@ -50,27 +51,26 @@
     const detectedSites = converterSite === 'AUTO'
       ? ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? []
       : [converterSite];
-    const results = validId
+    converterResults = validId
       ? detectedSites
           .map((key) => {
             const source = converterSources[key];
-            if (!source) return '';
-            return source.buildUrl ? source.buildUrl(id) : `${source.label}（${source.domain}） · 編號 ${id}`;
+            if (!source) return null;
+            const url = source.buildUrl ? source.buildUrl(id) : `${source.label}（${source.domain}） · 編號 ${id}`;
+            return { key, label: source.label, url };
           })
-          .filter(Boolean)
+          .filter((result): result is { key: string; label: string; url: string } => Boolean(result))
       : [];
-    converterUrls = results;
-    converterUrl = validId
-      ? detectedSites.map((key) => converterSources[key]?.buildUrl?.(id)).find(Boolean) ?? ''
-      : '';
-    converterOutput = results.join('\n');
+    converterUrls = converterResults.map((result) => result.url);
+    converterUrl = converterResults[0]?.url ?? '';
+    converterOutput = converterUrls.join('\\n');
   }
-
   function clearConverter() {
     converterInput = '';
     converterOutput = '';
     converterUrl = '';
     converterUrls = [];
+    converterResults = [];
     notice = '';
   }
 
@@ -429,17 +429,36 @@
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
-            <div class="converter-output-row">
-              <div class="converter-output-text" aria-live="polite">{converterOutput || '輸入編號後會在此顯示結果'}</div>
-              <div class="converter-output-actions">
-                <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}>▢</button>
-                <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
+            {#if converterResults.length > 1}
+              <div class="converter-multi-results">
+                {#each converterResults as result (result.key)}
+                  <div class="converter-multi-result">
+                    <div class="converter-multi-heading">{result.label}</div>
+                    <div class="converter-multi-url">{result.url}</div>
+                    <div class="converter-multi-actions">
+                      <button class="secondary-button" onclick={() => window.open(result.url, '_blank', 'noopener,noreferrer')}>↗ 開啟{result.label}</button>
+                      <button class="converter-icon-button" aria-label={'複製' + result.label + '網址'} title={'複製' + result.label + '網址'} onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}>▢</button>
+                    </div>
+                  </div>
+                {/each}
               </div>
-            </div>
-            <div class="converter-result-actions">
-              <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
-            </div>
-            <div class="converter-preview-note"><span>ⓘ</span> N 站已支援依編號產生作品網址；W 站網址規則尚待設定。</div>
+              <div class="converter-result-actions">
+                <button class="secondary-button" onclick={copyConverterOutput}>▢ 複製全部</button>
+                <button class="secondary-button" onclick={shareConverterOutput}>↗ 分享全部</button>
+              </div>
+            {:else}
+              <div class="converter-output-row">
+                <div class="converter-output-text" aria-live="polite">{converterOutput || '輸入編號後會在此顯示結果'}</div>
+                <div class="converter-output-actions">
+                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}>▢</button>
+                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
+                </div>
+              </div>
+              <div class="converter-result-actions">
+                <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
+              </div>
+            {/if}
+            <div class="converter-preview-note"><span>ⓘ</span> 自動識別 6 位數時會分別顯示 N 站與 W 站結果，可各自開啟或複製。</div>
           </div>
           <div class="converter-footer-actions">
             <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
@@ -550,6 +569,13 @@
   .converter-icon-button:disabled { opacity:.35; cursor:not-allowed; }
   .converter-hint { margin:10px 2px 0; color:var(--muted); font-size:10px; }
   .converter-output-row { display:flex; align-items:center; gap:12px; min-height:84px; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--bg); }
+  .converter-multi-results { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .converter-multi-result { min-width:0; display:flex; flex-direction:column; gap:10px; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--bg); }
+  .converter-multi-heading { font-size:12px; font-weight:700; color:var(--accent); }
+  .converter-multi-url { min-width:0; flex:1; overflow-wrap:anywhere; font-size:11px; line-height:1.7; }
+  .converter-multi-actions { display:flex; align-items:center; gap:8px; }
+  .converter-multi-actions .secondary-button { flex:1; padding:9px 8px; font-size:10px; }
+  @media (max-width:520px) { .converter-multi-results { grid-template-columns:1fr; } }
   .converter-output-text { min-width:0; flex:1; text-align:center; white-space:pre-line; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
   .converter-result-actions { display:flex; gap:12px; margin-top:14px; }
   .converter-result-actions button { flex:1; }
