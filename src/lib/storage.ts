@@ -33,6 +33,15 @@ interface HToolsDB extends DBSchema {
 
 let databasePromise: Promise<IDBPDatabase<HToolsDB>> | undefined;
 
+export async function closeStorageDatabase(): Promise<void> {
+  const current = databasePromise;
+  databasePromise = undefined;
+  if (current) {
+    const db = await current;
+    db.close();
+  }
+}
+
 function getDatabase() {
   if (!globalThis.indexedDB) return Promise.reject(new Error('此環境不支援 IndexedDB，無法保存紀錄。'));
   databasePromise ??= openDB<HToolsDB>('h-tools', 2, {
