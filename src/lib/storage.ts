@@ -19,6 +19,15 @@ export interface ResultHistoryItem {
   createdAt: number;
 }
 
+export type SyncEntity = 'stopwatchRecords' | 'resultHistory' | 'favorites';
+
+export interface SyncTombstone {
+  key: string;
+  entity: SyncEntity;
+  id: string;
+  deletedAt: number;
+}
+
 export interface FavoriteItem {
   id: string;
   source?: string;
