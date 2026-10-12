@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { deleteStopwatchRecord, listStopwatchRecords, saveStopwatchRecord, type StopwatchRecord } from '../lib/storage';
+  import { deleteFavorite, deleteStopwatchRecord, listFavorites, listStopwatchRecords, saveFavorite, saveStopwatchRecord, type FavoriteItem, type StopwatchRecord } from '../lib/storage';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -19,6 +19,11 @@
   let tick: ReturnType<typeof setInterval> | undefined;
   let runningState: RunningState | null = null;
   let records: StopwatchRecord[] = [];
+  let favorites: FavoriteItem[] = [];
+  let favoriteTitle = '';
+  let favoriteUrl = '';
+  let favoriteNotes = '';
+  let favoriteQuery = '';
   let storageError = '';
   let notice = '';
   let recordQuery = '';
@@ -28,6 +33,7 @@
     ? runningState.accumulatedMs + (runningState.running ? Math.max(0, now - runningState.startedAt) : 0)
     : 0;
   $: filteredRecords = records.filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()));
+  $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())));
   $: elapsedLabel = formatDuration(elapsedMs);
 
   function formatDuration(milliseconds: number): string {
@@ -104,6 +110,49 @@
     }
   }
 
+  async function addFavorite() {
+    storageError = '';
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(favoriteUrl.trim());
+      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') throw new Error('Only HTTP(S) URLs are supported.');
+    } catch {
+      storageError = '請輸入有效的 http 或 https 網址。';
+      return;
+    }
+    const timestamp = Date.now();
+    const normalizedUrl = parsedUrl.href;
+    const existing = favorites.find((item) => item.url === normalizedUrl);
+    const item: FavoriteItem = {
+      id: existing?.id ?? crypto.randomUUID(),
+      url: normalizedUrl,
+      title: favoriteTitle.trim() || parsedUrl.hostname,
+      notes: favoriteNotes.trim() || undefined,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    };
+    try {
+      await saveFavorite(item);
+      favorites = await listFavorites();
+      favoriteTitle = '';
+      favoriteUrl = '';
+      favoriteNotes = '';
+      notice = existing ? '已更新這個收藏。' : '已加入收藏。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '保存收藏失敗。';
+    }
+  }
+
+  async function removeFavorite(id: string) {
+    try {
+      await deleteFavorite(id);
+      favorites = await listFavorites();
+      notice = '已取消收藏。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '刪除收藏失敗。';
+    }
+  }
+
   function updateTheme() {
     const light = window.matchMedia('(prefers-color-scheme: light)').matches;
     const resolved = theme === 'system' ? (light ? 'light' : 'dark') : theme;
@@ -143,6 +192,8 @@
     tick = setInterval(() => { now = Date.now(); }, 100);
     listStopwatchRecords().then((value) => { records = value; })
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取紀錄失敗。'; });
+    listFavorites().then((value) => { favorites = value; })
+      .catch((error) => { storageError = error instanceof Error ? error.message : '讀取收藏失敗。'; });
     return () => {
       if (tick) clearInterval(tick);
       media.removeEventListener('change', onThemeChange);
@@ -226,8 +277,26 @@
         <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>來源清單確認後，再逐項加入可靠的轉換規則。</p></div></section>
         <section class="placeholder-card"><div class="placeholder-icon">↗</div><h2>轉換器的骨架已就位</h2><p>目前還沒加入任何來源規則，因此不會猜測網址或產生可能錯誤的連結。</p><label for="converter-id">測試輸入欄位</label><input id="converter-id" class="converter-input" bind:value={converterInput} placeholder="輸入編號或網址" /><button class="primary-button" onclick={checkConverterInput}>檢查輸入</button><small>來源註冊表與驗證規則會獨立實作，避免轉換邏輯散落在介面中。</small></section>
       {:else}
-        <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏功能會與歷史紀錄分開保存與管理。</p></div></section>
-        <section class="placeholder-card"><div class="placeholder-icon">☆</div><h2>收藏區尚在建置中</h2><p>下一階段會加入收藏資料模型、搜尋、排序與快速開啟功能。</p></section>
+        <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
+        <section class="favorite-editor">
+          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>新增收藏</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
+          <form class="favorite-form" onsubmit={(event) => { event.preventDefault(); void addFavorite(); }}>
+            <label>網址 <input bind:value={favoriteUrl} type="url" required placeholder="https://example.com/page" /></label>
+            <label>標題 <input bind:value={favoriteTitle} placeholder="留空時使用網站網域" /></label>
+            <label>備註 <input bind:value={favoriteNotes} placeholder="選填，例如用途或關鍵字" /></label>
+            <button class="primary-button" type="submit">＋ 儲存收藏</button>
+          </form>
+        </section>
+        <section class="records-section full-records">
+          <label class="search-field"><span>⌕</span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label>
+          {#if filteredFavorites.length === 0}
+            <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字。' : '使用上方表單保存常用網址。'}</span></div>
+          {:else}
+            <div class="favorite-list">{#each filteredFavorites as item (item.id)}
+              <article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>
+            {/each}</div>
+          {/if}
+        </section>
       {/if}
 
       {#if storageError}<div class="toast error" role="alert">{storageError}</div>{/if}
@@ -271,7 +340,7 @@
   .record-symbol { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border:1px solid var(--line); border-radius:10px; color:var(--accent); background:var(--panel-2); font-size:17px; }.record-info { min-width:0; flex:1; }.record-info strong { display:block; font-size:11px; font-weight:600; overflow-wrap:anywhere; }.record-info small { display:block; margin-top:5px; font-size:9px; color:var(--muted); }
   .record-duration { font-size:12px; font-variant-numeric:tabular-nums; letter-spacing:.03em; }.delete-button { width:27px; height:27px; border:1px solid transparent; background:transparent; color:var(--muted); border-radius:7px; font-size:19px; cursor:pointer; }.delete-button:hover { color:#ff8f9b; border-color:#ff8f9b35; }
   .empty-state { min-height:164px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:25px 15px; }.empty-icon { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px; color:var(--accent); background:var(--panel-2); font-size:20px; margin-bottom:3px; }.empty-state strong { font-size:11px; font-weight:600; }.empty-state span { font-size:10px; color:var(--muted); line-height:1.6; }
-  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
+  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
   .setting-badge { border:1px solid #62d8a32a; color:#62d8a3; background:#62d8a30b; border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
@@ -284,7 +353,7 @@
     nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
     .topbar { height:55px; padding:0 18px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.topbar-actions { gap:11px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
     .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
-    .records-section { margin-top:26px; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.page-footer { margin-top:28px; font-size:7px; }
+    .records-section { margin-top:26px; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 </style>
