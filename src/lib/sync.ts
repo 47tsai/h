@@ -199,7 +199,7 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
 async function requestSync(endpoint: string, document: SyncDocument) {
   let response: Response;
   try {
-    response = await fetch(endpoint.replace(/\\/+$/, '') + '/api/sync', {
+    response = await fetch(endpoint.replace(/\/+$/, '') + '/api/sync', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
