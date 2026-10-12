@@ -96,16 +96,17 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
   for (const item of document.favorites) await saveFavorite(item);
 }
 
-const PASSWORD_STORAGE_KEY = 'h-tools-sync-password';
+export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
+  if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
 
-async function postSyncRequest(endpoint: string, payload: Record<string, unknown>): Promise<{ response: Response; result: unknown }> {
+  const document = await createLocalDocument(theme);
   let response: Response;
   try {
-    response = await fetch(endpoint.replace(/\/+$/, '') + '/api/sync', {
+    response = await fetch(endpoint.replace(/\\/+$/, '') + '/api/sync', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ action: 'sync', document }),
     });
   } catch {
     throw new Error('無法連線同步服務，請檢查網路或稍後再試。');
@@ -117,48 +118,12 @@ async function postSyncRequest(endpoint: string, payload: Record<string, unknown
   } catch {
     throw new Error('同步服務回應格式不正確。');
   }
-  return { response, result };
-}
 
-function responseError(result: unknown): string {
-  const code = result && typeof result === 'object' && 'error' in result
-    ? String((result as { error: unknown }).error)
-    : '';
-  return ERROR_MESSAGES[code] ?? '同步失敗，請稍後再試。';
-}
-
-export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
-  if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
-
-  let password = '';
-  try { password = localStorage.getItem(PASSWORD_STORAGE_KEY) ?? ''; } catch { /* Ask again if storage is unavailable. */ }
-  if (!password) {
-    const entered = window.prompt('首次使用雲端同步，請輸入同步密碼。驗證成功後會在這台裝置保存，之後不必重複輸入。');
-    if (entered === null || !entered) throw new Error('已取消同步密碼設定。');
-    password = entered;
-  }
-
-  const auth = await postSyncRequest(endpoint, { action: 'check-auth', password });
-  if (!auth.response.ok || !auth.result || typeof auth.result !== 'object'
-    || !('ok' in auth.result) || (auth.result as { ok: unknown }).ok !== true) {
-    if (auth.result && typeof auth.result === 'object' && 'error' in auth.result
-      && (auth.result as { error: unknown }).error === 'AUTH_FAILED') {
-      try { localStorage.removeItem(PASSWORD_STORAGE_KEY); } catch { /* Ignore storage errors. */ }
-      throw new Error('同步密碼錯誤，請重新按「立即同步」輸入正確密碼。');
-    }
-    throw new Error(responseError(auth.result));
-  }
-
-  try { localStorage.setItem(PASSWORD_STORAGE_KEY, password); } catch { /* Sync can continue for this session. */ }
-
-  const document = await createLocalDocument(theme);
-  const { response, result } = await postSyncRequest(endpoint, { action: 'sync', password, document });
   if (!response.ok || !validateResponse(result)) {
-    if (result && typeof result === 'object' && 'error' in result
-      && (result as { error: unknown }).error === 'AUTH_FAILED') {
-      try { localStorage.removeItem(PASSWORD_STORAGE_KEY); } catch { /* Ignore storage errors. */ }
-    }
-    throw new Error(responseError(result));
+    const code = result && typeof result === 'object' && 'error' in result
+      ? String((result as { error: unknown }).error)
+      : '';
+    throw new Error(ERROR_MESSAGES[code] ?? '同步失敗，請稍後再試。');
   }
 
   await applyRemoteDocument(result.document);
