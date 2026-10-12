@@ -114,11 +114,22 @@
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
   $: filteredResultHistory = resultHistory.filter((item) => [item.url, item.sourceLabel].some((value) => value.toLocaleLowerCase().includes(resultQuery.toLocaleLowerCase()))).sort((a,b) => resultSort === 'oldest' ? a.lastActionAt-b.lastActionAt : b.lastActionAt-a.lastActionAt);
   $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? '', favoriteSourceLabel(item)].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase()))).sort((a, b) => favoriteSort === 'oldest' ? a.createdAt - b.createdAt : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW') : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt : b.createdAt - a.createdAt);
-  $: favoriteGroups = [...new Set(filteredFavorites.map((item) => favoriteSourceLabel(item)))].map((label) => ({ label, items: filteredFavorites.filter((item) => favoriteSourceLabel(item) === label) }));
+  $: favoriteGroups = groupFavorites(filteredFavorites);
   $: elapsedLabel = formatDuration(elapsedMs);
 
   function favoriteSourceLabel(item: FavoriteItem): string {
     return item.source && converterSources[item.source] ? converterSources[item.source].label : sourceForUrl(item.url).label;
+  }
+
+  function groupFavorites(items: FavoriteItem[]): { label: string; items: FavoriteItem[] }[] {
+    const groups = new Map<string, FavoriteItem[]>();
+    for (const item of items) {
+      const label = favoriteSourceLabel(item);
+      const group = groups.get(label);
+      if (group) group.push(item);
+      else groups.set(label, [item]);
+    }
+    return Array.from(groups, ([label, groupedItems]) => ({ label, items: groupedItems }));
   }
   async function logResultAction(result: {key:string;label:string;url:string}, action: 'open'|'copy'|'share') {
     const timestamp = Date.now();
