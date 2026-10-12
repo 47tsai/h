@@ -102,7 +102,7 @@ export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' 
   const document = await createLocalDocument(theme);
   let response: Response;
   try {
-    response = await fetch(endpoint.replace(/\\/+$/, '') + '/api/sync', {
+    response = await fetch(endpoint.replace(/\/+$/, '') + '/api/sync', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
