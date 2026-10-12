@@ -77,7 +77,7 @@ function isSafeHttpUrl(value) {
   if (typeof value !== 'string' || value.length > 4096) return false;
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' || url.protocol === 'http:';
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname) && !url.username && !url.password;
   } catch {
     return false;
   }
