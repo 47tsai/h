@@ -51,10 +51,9 @@
     const id = converterInput.trim();
     const validId = Boolean(id && /^[0-9]+$/.test(id));
     const textSites = ['M', 'J'];
+    const numericSites = ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? [];
     const detectedSites = converterSite === 'AUTO'
-      ? validId
-        ? [...((({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? []), 'M', 'J']
-        : ['M', 'J']
+      ? validId ? [...numericSites, 'M', 'J'] : ['M', 'J']
       : [converterSite];
     converterResults = id
       ? detectedSites
@@ -415,7 +414,7 @@
         <section class="converter-layout">
           <div class="converter-source-card">
             <label class="converter-source-label" for="converter-site">來源</label>
-            <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => updateConverterOutput()}>
+            <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }}>
               <option value="AUTO">自動識別</option>
               <option value="N">N站</option>
               <option value="W">W站</option>
