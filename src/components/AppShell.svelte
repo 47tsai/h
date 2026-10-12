@@ -35,9 +35,19 @@
   let converterSite = 'N';
   let converterOutput = '';
 
+  const converterSources: Record<string, { label: string; domain: string }> = {
+    N: { label: 'N 站', domain: 'n.com' },
+    W: { label: 'W 站', domain: 'w.com' },
+    JM: { label: 'JM 站', domain: 'jm.com' },
+    P: { label: 'P 站', domain: 'p.com' },
+  };
+
   function updateConverterOutput() {
     const id = converterInput.trim();
-    converterOutput = id && /^[0-9]+$/.test(id) ? `https://example.invalid/${converterSite}/${id}` : '';
+    const source = converterSources[converterSite];
+    converterOutput = id && /^[0-9]+$/.test(id) && source
+      ? `${source.label}（${source.domain}） · 編號 ${id}`
+      : '';
   }
 
   function clearConverter() {
@@ -379,7 +389,7 @@
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
             </div>
-            <p class="converter-hint">選擇來源並輸入編號，結果會即時更新。</p>
+            <p class="converter-hint">選擇來源並輸入編號，結果會即時更新。網站網域僅作顯示，尚未建立來源專用的轉換規則。</p>
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
@@ -394,7 +404,7 @@
               <button class="primary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>▧ 預覽</button>
               <button class="secondary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>↗ 開啟</button>
             </div>
-            <div class="converter-preview-note"><span>ⓘ</span> 目前僅重製操作介面；來源網址與預覽功能尚未連接。</div>
+            <div class="converter-preview-note"><span>ⓘ</span> 已設定四個來源的網域名稱。這裡目前顯示來源與編號，不會產生或開啟作品頁面網址。</div>
           </div>
           <div class="converter-footer-actions">
             <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
