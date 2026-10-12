@@ -126,6 +126,14 @@ describe('atomic backup import', () => {
     expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(false);
   });
 
+  it('rolls back the whole import when any record is invalid', async () => {
+    const valid = sampleRecord({ id: 'should-roll-back' });
+    const invalid = { title: 'missing ID' } as unknown as StopwatchRecord;
+
+    await expect(importBackupData([valid, invalid], [], [])).rejects.toBeTruthy();
+    expect(await listStopwatchRecords()).toEqual([]);
+  });
+
   it('merges history by URL without violating the unique URL index', async () => {
     const { recordResultAction } = await import('./storage');
     const existing = {
