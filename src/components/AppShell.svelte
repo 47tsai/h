@@ -131,19 +131,21 @@
   $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
   $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
+  $: normalizedResultQuery = resultQuery.toLocaleLowerCase();
   $: filteredResultHistory = resultHistory
     .filter((item) =>
       [item.url, item.sourceLabel].some((value) =>
-        value.toLocaleLowerCase().includes(resultQuery.toLocaleLowerCase()),
+        value.toLocaleLowerCase().includes(normalizedResultQuery),
       ),
     )
     .sort((a, b) =>
       resultSort === 'oldest' ? a.lastActionAt - b.lastActionAt : b.lastActionAt - a.lastActionAt,
     );
+  $: normalizedFavoriteQuery = favoriteQuery.toLocaleLowerCase();
   $: filteredFavorites = favorites
     .filter((item) =>
       [item.title, item.url, item.notes ?? '', favoriteSourceLabel(item)].some((value) =>
-        value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase()),
+        value.toLocaleLowerCase().includes(normalizedFavoriteQuery),
       ),
     )
     .sort((a, b) =>
