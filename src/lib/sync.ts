@@ -1,7 +1,5 @@
 import {
-  deleteFavorite,
-  deleteResultHistory,
-  deleteStopwatchRecord,
+  applySyncSnapshotIfUnchanged,
   listFavorites,
   listResultHistory,
   listStopwatchRecords,
@@ -178,24 +176,6 @@ async function createLocalDocument(theme: 'system' | 'light' | 'dark'): Promise<
   };
 }
 
-async function applyRemoteDocument(document: SyncDocument): Promise<void> {
-  const [localRecords, localHistory, localFavorites] = await Promise.all([
-    listStopwatchRecords(), listResultHistory(), listFavorites(),
-  ]);
-  const recordIds = new Set(document.stopwatchRecords.map((item) => item.id));
-  const historyIds = new Set(document.resultHistory.map((item) => item.id));
-  const favoriteIds = new Set(document.favorites.map((item) => item.id));
-
-  for (const item of localRecords) if (!recordIds.has(item.id)) await deleteStopwatchRecord(item.id);
-  for (const item of localHistory) if (!historyIds.has(item.id)) await deleteResultHistory(item.id);
-  for (const item of localFavorites) if (!favoriteIds.has(item.id)) await deleteFavorite(item.id);
-
-  for (const tombstone of document.tombstones) await saveSyncTombstone(tombstone);
-  for (const item of document.stopwatchRecords) await saveStopwatchRecord(item);
-  for (const item of document.resultHistory) await recordResultAction(item);
-  for (const item of document.favorites) await saveFavorite(item);
-}
-
 async function requestSync(endpoint: string, document: SyncDocument) {
   let response: Response;
   try {
@@ -225,41 +205,22 @@ async function requestSync(endpoint: string, document: SyncDocument) {
   return result;
 }
 
-function hasSameLocalData(left: SyncDocument, right: SyncDocument): boolean {
-  return JSON.stringify({
-    settings: left.settings,
-    stopwatchRecords: left.stopwatchRecords,
-    resultHistory: left.resultHistory,
-    favorites: left.favorites,
-    tombstones: left.tombstones,
-  }) === JSON.stringify({
-    settings: right.settings,
-    stopwatchRecords: right.stopwatchRecords,
-    resultHistory: right.resultHistory,
-    favorites: right.favorites,
-    tombstones: right.tombstones,
-  });
-}
-
 export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
   if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
 
   let document = await createLocalDocument(theme);
-  let result: { ok: true; document: SyncDocument; syncedAt: string } | undefined;
   const maxAttempts = 3;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    result = await requestSync(endpoint, document);
-    const latestLocalDocument = await createLocalDocument(theme);
-    if (hasSameLocalData(document, latestLocalDocument)) break;
+    const result = await requestSync(endpoint, document);
+    const applied = await applySyncSnapshotIfUnchanged(document, result.document);
+    if (applied) return { syncedAt: result.syncedAt, document: result.document };
 
     if (attempt === maxAttempts - 1) {
       throw new Error('同步期間本機資料持續變更，為避免覆蓋新資料，請稍後重新同步。');
     }
-    document = latestLocalDocument;
+    document = await createLocalDocument(theme);
   }
 
-  if (!result) throw new Error('同步失敗，請稍後再試。');
-  await applyRemoteDocument(result.document);
-  return { syncedAt: result.syncedAt, document: result.document };
+  throw new Error('同步失敗，請稍後再試。');
 }
