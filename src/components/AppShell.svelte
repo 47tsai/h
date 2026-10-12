@@ -625,7 +625,7 @@
           {#if syncWorkerUrl}
             <p class="sync-privacy-warning" role="note">隱私提醒：目前同步檔案位於公開 GitHub 儲存庫，任何人都可能讀取。請勿同步密碼、私人資訊或不希望公開的收藏與歷史紀錄。</p>
             <div class="sync-controls">
-              <input type="password" bind:value={syncPassword} autocomplete="current-password" placeholder="輸入同步密碼" aria-label="雲端同步密碼" disabled={syncBusy} />
+              <input type="password" bind:value={syncPassword} autocomplete="off" placeholder="輸入同步密碼" aria-label="雲端同步密碼" disabled={syncBusy} />
               <button class="secondary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
             </div>
             <p class="sync-last-success">同步密碼只用於本次 HTTPS 請求，不會儲存至本機。</p>
