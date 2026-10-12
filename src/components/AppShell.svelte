@@ -48,8 +48,8 @@
     W: { label: '紳士漫畫', domain: 'wnacg.com', buildUrl: (id) => `https://www.wnacg.com/photos-slide-aid-${id}.html` },
     JM: { label: '禁漫天堂', domain: '18comic.vip', buildUrl: (id) => `https://18comic.vip/photo/${id}` },
     P: { label: 'Pixiv', domain: 'pixiv.net', buildUrl: (id) => `https://www.pixiv.net/artworks/${id}` },
-    M: { label: 'M 站', domain: 'm.com', buildUrl: (id) => `https://m.com/${encodeURIComponent(id.toLowerCase())}` },
-    J: { label: 'J 站', domain: 'j.com', buildUrl: (id) => `https://j.com/videos/${encodeURIComponent(id.toLowerCase())}` },
+    M: { label: 'missav', domain: 'missav.ws', buildUrl: (id) => `https://missav.ws/${encodeURIComponent(id.toLowerCase())}` },
+    J: { label: 'Jable', domain: 'jable.tv', buildUrl: (id) => `https://jable.tv/videos/${encodeURIComponent(id.toLowerCase())}` },
   };
 
   function updateConverterOutput() {
