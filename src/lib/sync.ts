@@ -97,6 +97,7 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
 }
 
 export async function syncWithCloud(endpoint: string, password: string, theme: 'system' | 'light' | 'dark') {
+  password = password.trim();
   if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
   if (password.length < 1) throw new Error('請輸入同步密碼。');
 
