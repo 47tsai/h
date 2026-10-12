@@ -1,57 +1,45 @@
 # H Tools Sync Worker
 
-## 1. Create a private data repository
+The Worker is deployed automatically by GitHub Actions when files under `worker/` change, or when the workflow is run manually.
 
-Create a dedicated **private** GitHub repository for sync data. Do not use the public application repository. A fine-grained GitHub token should have access only to that private repository and **Contents: Read and write** permission.
+## 1. GitHub Actions secrets
 
-## 2. Configure the Worker
+In `tsai97216/h`, open **Settings → Secrets and variables → Actions → New repository secret** and add:
 
-From this directory, replace `GITHUB_REPO` in `wrangler.toml` with the private repository name. Keep `ALLOWED_ORIGIN` set to the exact deployed site origin.
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** and **Account Settings: Read** permissions for the target account.
+- `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID.
+- `SYNC_GITHUB_TOKEN`: a fine-grained GitHub token limited to `tsai97216/h`, with **Contents: Read and write** permission.
+- `SYNC_PASSWORD`: a unique sync password of at least 16 characters. Do not reuse your GitHub or Cloudflare password.
 
-Install Wrangler if needed, then log in:
+The workflow derives a salted PBKDF2-SHA256 hash from `SYNC_PASSWORD` during deployment and uploads only the hash as the Worker secret `SYNC_PASSWORD_HASH`. It uploads `SYNC_GITHUB_TOKEN` to the Worker as `GITHUB_TOKEN`. Do not put any of these values in source files or paste them into chat.
 
-```sh
-npm install --global wrangler
-wrangler login
-```
+## 2. Worker configuration and public sync data
 
-Set secrets interactively. The token is never committed to the repository:
+The Worker is configured to store the document in this repository at `data/sync.json`. The file is public by design, so anyone can read its contents. Do not sync sensitive or private information.
 
-```sh
-wrangler secret put GITHUB_TOKEN
-node scripts/hash-sync-password.mjs
-wrangler secret put SYNC_PASSWORD_HASH
-```
-
-Paste the hash output from the helper into the second command's prompt. The sync password must be at least 16 characters and unique to this app. It is not your GitHub password or token.
-
-Deploy from this directory:
-
-```sh
-wrangler deploy
-```
-
-The deployed URL should look like `https://h-tools-sync.<your-account>.workers.dev`. The frontend uses the `/api/sync` path.
+The Worker accepts browser requests only from `https://h.chi.qzz.io`. The GitHub token is scoped to this repository and kept in Worker Secrets at runtime.
 
 ## 3. Connect the site
 
-In GitHub, open the `tsai97216/h` repository settings, then **Secrets and variables → Actions → Variables**. Add a repository variable:
+In GitHub, open **Settings → Secrets and variables → Actions → Variables**. Add a repository variable:
 
 - Name: `PUBLIC_SYNC_WORKER_URL`
-- Value: the deployed Worker origin, for example `https://h-tools-sync.<your-account>.workers.dev` (no trailing slash and no `/api/sync` suffix).
+- Value: the deployed Worker origin, such as `https://h-tools-sync.<your-account>.workers.dev`, with no trailing slash and no `/api/sync` suffix.
 
-Run the Pages deployment workflow again. The public URL is not a secret; do not add the GitHub token or sync password as a Pages variable.
+The Pages workflow uses this variable to configure the frontend. Re-run the Pages workflow after setting it.
 
-## 4. Verify
+## 4. Deploy and verify
 
-- Open the site and use Settings → Cloud Sync.
-- Enter the dedicated sync password and run a manual sync.
-- A wrong password should return an authentication error without changing the private repository.
-- The Worker accepts only `https://h.chi.qzz.io` as browser origin by default.
-- Only confirmed GitHub writes are reported as successful. Failed syncs do not clear local data.
+1. Add all four repository secrets above.
+2. Add `PUBLIC_SYNC_WORKER_URL` after the Worker has deployed successfully for the first time.
+3. Run **Actions → Deploy Cloudflare Worker → Run workflow**.
+4. Open the site and use **Settings → Cloud Sync** to test a manual sync.
 
-## Data and security
+A successful sync writes `data/sync.json` to the public repository. The Pages and CI workflows ignore commits that only change this data file, so syncing will not trigger unnecessary website builds.
 
-The Worker stores a single versioned JSON document at `data/sync.json` in the private repository. The password is sent only in a POST body over HTTPS and is never saved by the frontend. GitHub credentials exist only as Worker secrets. The Worker restricts its repository, branch, path, request size, schema, origin, and request rate.
+## Security notes
 
-The first sync merges by stable ID and timestamp. Deletion tombstones are synchronized so deleted records do not silently reappear. Tombstones are retained to prevent older devices from restoring deleted items.
+- Never commit GitHub or Cloudflare tokens.
+- The sync password is sent over HTTPS and is never stored by the frontend.
+- The Worker validates payload size and schema, restricts the repository, branch, file path, browser origin, and request rate.
+- Deletion tombstones are retained so old devices do not silently restore deleted items.
