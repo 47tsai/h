@@ -566,7 +566,7 @@
   .converter-multi-heading { font-size:12px; font-weight:700; color:var(--accent); }
   .converter-multi-url { min-width:0; flex:1; overflow-wrap:anywhere; font-size:11px; line-height:1.7; }
   .converter-multi-actions { display:flex; align-items:center; gap:8px; }
-  .converter-multi-actions .secondary-button { flex:1; padding:9px 8px; font-size:10px; }
+  .converter-multi-actions .secondary-button { flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:5px; white-space:nowrap; padding:9px 8px; font-size:10px; }
   @media (max-width:520px) { .converter-multi-results { grid-template-columns:1fr; } }
   .converter-output-text { min-width:0; flex:1; text-align:center; white-space:pre-line; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
   .converter-result-actions { display:flex; gap:12px; margin-top:14px; }
