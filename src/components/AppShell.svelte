@@ -1,0 +1,290 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { deleteStopwatchRecord, listStopwatchRecords, saveStopwatchRecord, type StopwatchRecord } from '../lib/storage';
+
+  type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
+  type Theme = 'dark' | 'light' | 'system';
+  type RunningState = { sessionStartedAt: number; startedAt: number; accumulatedMs: number; running: boolean };
+  const navigation: { id: Section; label: string; icon: string; hint: string }[] = [
+    { id: 'converter', label: '編號轉換', icon: '↗', hint: 'Converter' },
+    { id: 'history', label: '歷史紀錄', icon: '◷', hint: 'History' },
+    { id: 'favorites', label: '我的收藏', icon: '☆', hint: 'Favorites' },
+    { id: 'stopwatch', label: '純碼錶', icon: '◴', hint: 'Stopwatch' },
+    { id: 'settings', label: '設定', icon: '⚙', hint: 'Settings' },
+  ];
+
+  let activeSection: Section = 'stopwatch';
+  let theme: Theme = 'system';
+  let now = Date.now();
+  let tick: ReturnType<typeof setInterval> | undefined;
+  let runningState: RunningState | null = null;
+  let records: StopwatchRecord[] = [];
+  let storageError = '';
+  let notice = '';
+  let recordQuery = '';
+  let converterInput = '';
+
+  $: elapsedMs = runningState
+    ? runningState.accumulatedMs + (runningState.running ? Math.max(0, now - runningState.startedAt) : 0)
+    : 0;
+  $: filteredRecords = records.filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()));
+  $: elapsedLabel = formatDuration(elapsedMs);
+
+  function formatDuration(milliseconds: number): string {
+    const total = Math.floor(milliseconds / 1000);
+    return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
+      .map((value) => String(value).padStart(2, '0')).join(':');
+  }
+
+  function makeTitle(timestamp: number): string {
+    const date = new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
+    const time = new Intl.DateTimeFormat('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(timestamp));
+    return date + ' ' + time;
+  }
+
+  function persistRunningState() {
+    try {
+      if (runningState) localStorage.setItem('h-tools-stopwatch-active', JSON.stringify(runningState));
+      else localStorage.removeItem('h-tools-stopwatch-active');
+    } catch {
+      storageError = '瀏覽器無法保存碼錶狀態，重新整理後可能無法恢復。';
+    }
+  }
+
+  function startStopwatch() {
+    const startedAt = Date.now();
+    runningState = { sessionStartedAt: startedAt, startedAt, accumulatedMs: 0, running: true };
+    persistRunningState();
+    notice = '';
+  }
+
+  function pauseStopwatch() {
+    if (!runningState || !runningState.running) return;
+    runningState = { ...runningState, accumulatedMs: elapsedMs, running: false };
+    persistRunningState();
+  }
+
+  function resumeStopwatch() {
+    if (!runningState || runningState.running) return;
+    runningState = { ...runningState, startedAt: Date.now(), running: true };
+    persistRunningState();
+  }
+
+  async function stopStopwatch() {
+    if (!runningState) return;
+    const endedAt = Date.now();
+    const durationMs = runningState.accumulatedMs + (runningState.running ? Math.max(0, endedAt - runningState.startedAt) : 0);
+    const record: StopwatchRecord = {
+      id: crypto.randomUUID(),
+      startedAt: runningState.sessionStartedAt,
+      endedAt,
+      durationMs,
+      title: makeTitle(runningState.sessionStartedAt),
+      createdAt: endedAt,
+    };
+    try {
+      await saveStopwatchRecord(record);
+      records = await listStopwatchRecords();
+      runningState = null;
+      persistRunningState();
+      notice = '碼錶紀錄已儲存在這台裝置。';
+      storageError = '';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '保存紀錄失敗。';
+    }
+  }
+
+  async function removeRecord(id: string) {
+    try {
+      await deleteStopwatchRecord(id);
+      records = await listStopwatchRecords();
+      notice = '已刪除這筆紀錄。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '刪除紀錄失敗。';
+    }
+  }
+
+  function updateTheme() {
+    const light = window.matchMedia('(prefers-color-scheme: light)').matches;
+    const resolved = theme === 'system' ? (light ? 'light' : 'dark') : theme;
+    document.documentElement.dataset.theme = resolved;
+    document.documentElement.style.colorScheme = resolved;
+  }
+
+  function applyTheme(value: Theme) {
+    theme = value;
+    try { localStorage.setItem('h-tools-theme', value); } catch { /* Session theme still works. */ }
+    updateTheme();
+  }
+
+  function checkConverterInput() {
+    notice = converterInput.trim()
+      ? '來源清單尚未確認，目前不會猜測或產生不可靠的網址。'
+      : '先輸入編號，再進行檢查。';
+  }
+
+  onMount(() => {
+    try {
+      const storedTheme = localStorage.getItem('h-tools-theme');
+      if (storedTheme === 'dark' || storedTheme === 'light' || storedTheme === 'system') theme = storedTheme;
+      const active = localStorage.getItem('h-tools-stopwatch-active');
+      if (active) {
+        const parsed = JSON.parse(active) as RunningState;
+        if (typeof parsed.sessionStartedAt === 'number' && typeof parsed.startedAt === 'number' &&
+          typeof parsed.accumulatedMs === 'number' && typeof parsed.running === 'boolean') runningState = parsed;
+      }
+    } catch {
+      storageError = '讀取本機設定失敗，部分狀態可能已重設。';
+    }
+    updateTheme();
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    const onThemeChange = () => { if (theme === 'system') updateTheme(); };
+    media.addEventListener('change', onThemeChange);
+    tick = setInterval(() => { now = Date.now(); }, 100);
+    listStopwatchRecords().then((value) => { records = value; })
+      .catch((error) => { storageError = error instanceof Error ? error.message : '讀取紀錄失敗。'; });
+    return () => {
+      if (tick) clearInterval(tick);
+      media.removeEventListener('change', onThemeChange);
+    };
+  });
+</script>
+
+<svelte:head>
+  <title>{(navigation.find((item) => item.id === activeSection)?.label ?? 'H Tools') + ' · H Tools'}</title>
+</svelte:head>
+
+<div class="app-frame">
+  <aside class="sidebar">
+    <a class="brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><span><strong>H Tools</strong><small>PERSONAL WORKSPACE</small></span></a>
+    <div class="nav-label">工作區</div>
+    <nav aria-label="主要導覽">
+      {#each navigation as item}
+        <button class:active={activeSection === item.id} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
+          <span class="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>
+          {#if activeSection === item.id}<span class="nav-dot"></span>{/if}
+        </button>
+      {/each}
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="local-status"><span class="status-dot"></span><span><strong>本機模式</strong><small>資料保存在此裝置</small></span></div>
+      <div class="sidebar-foot">H TOOLS <span>·</span> 0.1.0</div>
+    </div>
+  </aside>
+
+  <main class="main-area">
+    <header class="topbar">
+      <div class="breadcrumb"><span>Workspace</span><span class="slash">/</span><strong>{navigation.find((item) => item.id === activeSection)?.hint}</strong></div>
+      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span>僅本機儲存</span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}>⚙</button></div>
+    </header>
+
+    <div class="content">
+      {#if activeSection === 'stopwatch'}
+        <section class="page-heading"><div><div class="eyebrow">TIME TRACKING</div><h1>純碼錶</h1><p>不打擾節奏，只把經過的時間記下來。</p></div><div class="heading-chip"><span class="pulse"></span>本機紀錄</div></section>
+        <section class="stopwatch-card">
+          <div class="card-topline"><span class="live-indicator"></span><span>{runningState?.running ? 'STOPWATCH RUNNING' : runningState ? 'STOPWATCH PAUSED' : 'READY WHEN YOU ARE'}</span><span class="card-topline-right">LOCAL SESSION</span></div>
+          <div class="timer-display" aria-live="off">{elapsedLabel}<span class="timer-hundredths">.{String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0')}</span></div>
+          <div class="timer-caption">{runningState ? '開始時間 ' + makeTitle(runningState.sessionStartedAt) : '準備好時，按下開始即可'}</div>
+          <div class="timer-controls">
+            {#if !runningState}
+              <button class="primary-button" onclick={startStopwatch}><span>▶</span> 開始計時</button>
+            {:else if runningState.running}
+              <button class="secondary-button" onclick={pauseStopwatch}>Ⅱ 暫停</button><button class="primary-button" onclick={stopStopwatch}>■ 停止並儲存</button>
+            {:else}
+              <button class="secondary-button" onclick={resumeStopwatch}>▶ 繼續</button><button class="primary-button" onclick={stopStopwatch}>■ 停止並儲存</button>
+            {/if}
+          </div>
+          <div class="card-footnote"><span>◈</span> 依時間戳計算，離開頁面或重新開啟後仍可恢復</div>
+        </section>
+        <section class="records-section">
+          <div class="section-heading"><div><h2>最近紀錄</h2><p>紀錄只存在目前瀏覽器的本機資料庫</p></div><span class="count-pill">{records.length} 筆</span></div>
+          <div class="record-list">
+            {#if records.length === 0}
+              <div class="empty-state"><div class="empty-icon">◷</div><strong>還沒有碼錶紀錄</strong><span>完成第一次計時後，紀錄就會出現在這裡。</span></div>
+            {:else}
+              {#each records.slice(0, 5) as record (record.id)}
+                <article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>{new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>
+              {/each}
+              {#if records.length > 5}<button class="text-button" onclick={() => activeSection = 'history'}>查看全部 {records.length} 筆紀錄 →</button>{/if}
+            {/if}
+          </div>
+        </section>
+      {:else if activeSection === 'settings'}
+        <section class="page-heading"><div><div class="eyebrow">PREFERENCES</div><h1>設定</h1><p>調整介面偏好與本機資料行為。</p></div></section>
+        <section class="settings-card">
+          <div class="setting-row"><div><strong>介面主題</strong><p>系統模式會跟隨裝置的外觀設定。</p></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
+          <div class="setting-row"><div><strong>資料保存</strong><p>碼錶紀錄使用 IndexedDB；進行中的計時狀態保存在本機瀏覽器。</p></div><span class="setting-badge">LOCAL FIRST</span></div>
+          <div class="setting-row"><div><strong>雲端同步</strong><p>同步功能尚未啟用。完成 Worker 與安全驗證後才會加入手動同步。</p></div><span class="setting-badge muted">尚未設定</span></div>
+        </section>
+      {:else if activeSection === 'history'}
+        <section class="page-heading"><div><div class="eyebrow">YOUR ACTIVITY</div><h1>歷史紀錄</h1><p>搜尋與管理本機保存的碼錶紀錄。</p></div></section>
+        <section class="records-section full-records"><label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋紀錄名稱…" aria-label="搜尋碼錶紀錄" /></label>
+          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">⌕</div><strong>{records.length ? '沒有符合的紀錄' : '目前沒有紀錄'}</strong><span>{records.length ? '試試其他關鍵字。' : '完成一次碼錶計時後，紀錄會出現在這裡。'}</span></div>
+          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>{new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
+        </section>
+      {:else if activeSection === 'converter'}
+        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>來源清單確認後，再逐項加入可靠的轉換規則。</p></div></section>
+        <section class="placeholder-card"><div class="placeholder-icon">↗</div><h2>轉換器的骨架已就位</h2><p>目前還沒加入任何來源規則，因此不會猜測網址或產生可能錯誤的連結。</p><label for="converter-id">測試輸入欄位</label><input id="converter-id" class="converter-input" bind:value={converterInput} placeholder="輸入編號或網址" /><button class="primary-button" onclick={checkConverterInput}>檢查輸入</button><small>來源註冊表與驗證規則會獨立實作，避免轉換邏輯散落在介面中。</small></section>
+      {:else}
+        <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏功能會與歷史紀錄分開保存與管理。</p></div></section>
+        <section class="placeholder-card"><div class="placeholder-icon">☆</div><h2>收藏區尚在建置中</h2><p>下一階段會加入收藏資料模型、搜尋、排序與快速開啟功能。</p></section>
+      {/if}
+
+      {#if storageError}<div class="toast error" role="alert">{storageError}</div>{/if}
+      {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}>×</button></div>{/if}
+      <footer class="page-footer"><span>H TOOLS</span><span>本機優先 · 隱私優先 · 逐步實作</span></footer>
+    </div>
+  </main>
+</div>
+
+<style>
+  .app-frame { --bg:#0b0e14; --panel:#111722; --panel-2:#151d2b; --line:#252e3d; --text:#e8edf7; --muted:#8a96aa; --accent:#9caeff; --accent-strong:#7892ff; display:flex; min-height:100vh; background:var(--bg); color:var(--text); }
+  :global(:root[data-theme="light"]) .app-frame { --bg:#f4f6fb; --panel:#fff; --panel-2:#f8f9fd; --line:#e1e6f0; --text:#172033; --muted:#68758c; --accent:#405fdb; --accent-strong:#3452cb; }
+  .sidebar { width:244px; flex:0 0 244px; border-right:1px solid var(--line); padding:27px 15px 18px; display:flex; flex-direction:column; background:var(--bg); }
+  .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--text); padding:0 10px 35px; }
+  .brand-mark { width:38px; height:38px; border-radius:12px; display:grid; place-items:center; font-weight:800; font-size:20px; color:#0b1020; background:linear-gradient(145deg,#c2ceff,#738cff); }
+  .brand strong { display:block; font-size:15px; letter-spacing:.02em; }.brand small { display:block; color:var(--muted); font-size:8px; letter-spacing:.15em; margin-top:4px; }
+  .nav-label { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); padding:0 13px 12px; }
+  nav { display:grid; gap:5px; }.nav-item { display:flex; align-items:center; gap:12px; width:100%; border:1px solid transparent; color:var(--muted); background:transparent; border-radius:10px; padding:11px 12px; text-align:left; cursor:pointer; font-size:13px; }
+  .nav-item:hover { background:var(--panel); color:var(--text); }.nav-item.active { color:var(--text); background:var(--panel-2); border-color:var(--line); }
+  .nav-icon { width:20px; text-align:center; font-size:18px; line-height:1; }.nav-dot { width:5px; height:5px; border-radius:50%; background:var(--accent-strong); margin-left:auto; }
+  .sidebar-bottom { margin-top:auto; }.local-status { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--panel); padding:12px; border-radius:11px; }
+  .status-dot,.live-indicator { width:7px; height:7px; flex:0 0 7px; background:#62d8a3; border-radius:50%; box-shadow:0 0 0 4px #62d8a314; }
+  .local-status strong { display:block; font-size:11px; font-weight:600; }.local-status small { display:block; margin-top:3px; font-size:10px; color:var(--muted); }
+  .sidebar-foot { color:var(--muted); font-size:9px; letter-spacing:.14em; padding:20px 10px 0; }.sidebar-foot span { padding:0 4px; color:var(--line); }
+  .main-area { min-width:0; flex:1; }.topbar { height:70px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; padding:0 clamp(20px,4vw,54px); }
+  .breadcrumb { display:flex; align-items:center; gap:11px; font-size:11px; color:var(--muted); }.breadcrumb .slash { color:var(--line); }.breadcrumb strong { color:var(--text); font-weight:500; }
+  .topbar-actions { display:flex; align-items:center; gap:17px; }.sync-label { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; }.sync-label .status-dot { width:6px; height:6px; flex-basis:6px; }
+  .icon-button { width:33px; height:33px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--muted); cursor:pointer; }
+  .content { width:min(100%,1050px); margin:0 auto; padding:42px clamp(20px,4vw,54px) 22px; }.page-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:28px; }
+  .eyebrow { font-size:9px; color:var(--accent); letter-spacing:.19em; font-weight:700; margin-bottom:10px; }h1 { font-size:clamp(25px,3vw,32px); letter-spacing:-.04em; margin:0; line-height:1.2; font-weight:650; }
+  .page-heading p { color:var(--muted); font-size:12px; margin:10px 0 0; line-height:1.7; }.heading-chip { display:flex; align-items:center; gap:8px; padding:8px 11px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:10px; white-space:nowrap; }.pulse { width:6px; height:6px; background:#62d8a3; border-radius:50%; }
+  .stopwatch-card { overflow:hidden; border:1px solid #2a3448; border-radius:16px; padding:23px 26px 19px; background:radial-gradient(ellipse at 50% -30%,#5368b522 0%,transparent 60%),linear-gradient(135deg,#121927,#0f141e); box-shadow:0 20px 60px #00000012; }
+  :global(:root[data-theme="light"]) .stopwatch-card { background:radial-gradient(ellipse at 50% -30%,#8d9eff22 0%,transparent 60%),linear-gradient(135deg,#fff,#f7f8ff); border-color:#dfe4f4; }
+  .card-topline { display:flex; align-items:center; gap:9px; font-size:9px; letter-spacing:.13em; color:#9aa7be; }.live-indicator { width:6px; height:6px; flex-basis:6px; }.card-topline-right { margin-left:auto; font-size:8px; color:#68758b; }
+  .timer-display { display:flex; justify-content:center; align-items:baseline; margin:44px 0 7px; font-size:clamp(48px,8vw,79px); font-variant-numeric:tabular-nums; letter-spacing:-.065em; line-height:1; font-weight:450; color:var(--text); }.timer-hundredths { font-size:.36em; color:var(--accent); letter-spacing:-.02em; margin-left:3px; }.timer-caption { text-align:center; font-size:10px; color:var(--muted); min-height:16px; }
+  .timer-controls { display:flex; justify-content:center; gap:10px; margin:29px 0 25px; }.primary-button,.secondary-button { border-radius:9px; padding:11px 17px; border:1px solid transparent; cursor:pointer; font-size:11px; font-weight:650; transition:transform .15s,filter .15s; }.primary-button:hover,.secondary-button:hover { filter:brightness(1.08); transform:translateY(-1px); }
+  .primary-button { background:linear-gradient(135deg,#b8c5ff,#879bff); color:#11182c; }.secondary-button { background:#202a3a; border-color:#344158; color:#d7deee; }:global(:root[data-theme="light"]) .secondary-button { background:#edf0fa; color:#26314a; border-color:#d9deed; }
+  .card-footnote { display:flex; justify-content:center; align-items:center; gap:7px; padding-top:15px; border-top:1px solid #ffffff0c; color:#7f8ba1; font-size:9px; }.card-footnote span { color:var(--accent); font-size:13px; }
+  .records-section { margin-top:32px; }.section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.section-heading h2 { font-size:15px; margin:0; }.section-heading p { font-size:10px; color:var(--muted); margin:6px 0 0; }.count-pill { border:1px solid var(--line); border-radius:7px; padding:5px 8px; font-size:10px; color:var(--muted); }
+  .record-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.record-row { display:flex; align-items:center; gap:13px; min-height:70px; padding:12px 16px; border-bottom:1px solid var(--line); }.record-row:last-child { border-bottom:0; }
+  .record-symbol { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border:1px solid var(--line); border-radius:10px; color:var(--accent); background:var(--panel-2); font-size:17px; }.record-info { min-width:0; flex:1; }.record-info strong { display:block; font-size:11px; font-weight:600; overflow-wrap:anywhere; }.record-info small { display:block; margin-top:5px; font-size:9px; color:var(--muted); }
+  .record-duration { font-size:12px; font-variant-numeric:tabular-nums; letter-spacing:.03em; }.delete-button { width:27px; height:27px; border:1px solid transparent; background:transparent; color:var(--muted); border-radius:7px; font-size:19px; cursor:pointer; }.delete-button:hover { color:#ff8f9b; border-color:#ff8f9b35; }
+  .empty-state { min-height:164px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:25px 15px; }.empty-icon { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px; color:var(--accent); background:var(--panel-2); font-size:20px; margin-bottom:3px; }.empty-state strong { font-size:11px; font-weight:600; }.empty-state span { font-size:10px; color:var(--muted); line-height:1.6; }
+  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
+  .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
+  .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
+  .setting-badge { border:1px solid #62d8a32a; color:#62d8a3; background:#62d8a30b; border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
+  .full-records { margin-top:0; }.search-field { display:flex; align-items:center; gap:9px; border:1px solid var(--line); border-radius:10px; padding:0 12px; height:43px; margin-bottom:13px; background:var(--panel); color:var(--muted); }.search-field span { font-size:21px; }.search-field input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--text); font-size:11px; }
+  .placeholder-card { border:1px solid var(--line); border-radius:15px; padding:clamp(24px,5vw,44px); background:var(--panel); display:flex; align-items:flex-start; flex-direction:column; }.placeholder-icon { width:44px; height:44px; border:1px solid var(--line); border-radius:13px; background:var(--panel-2); display:grid; place-items:center; color:var(--accent); font-size:22px; margin-bottom:21px; }.placeholder-card h2 { font-size:16px; margin:0; }.placeholder-card p { font-size:11px; line-height:1.8; color:var(--muted); max-width:480px; margin:11px 0 24px; }.placeholder-card label { font-size:10px; color:var(--muted); margin-bottom:8px; }.converter-input { width:100%; max-width:460px; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:9px; padding:12px; font-size:11px; outline:none; margin-bottom:12px; }.converter-input:focus,.search-field:focus-within { border-color:var(--accent-strong); }.placeholder-card > small { margin-top:14px; color:var(--muted); font-size:9px; line-height:1.6; }
+  .toast { position:sticky; bottom:14px; margin:16px auto 0; width:fit-content; max-width:100%; padding:11px 15px; border:1px solid #62d8a344; background:var(--panel); border-radius:10px; box-shadow:0 8px 30px #0002; color:var(--text); font-size:10px; z-index:2; }.toast.error { border-color:#ff8f9b55; color:#ffabb3; }.toast button { margin-left:15px; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:15px; }
+  .page-footer { display:flex; justify-content:space-between; gap:15px; color:#667188; font-size:8px; letter-spacing:.07em; margin-top:39px; }
+  @media (max-width:760px) {
+    .app-frame { display:block; padding-bottom:75px; }.sidebar { position:fixed; z-index:5; bottom:0; left:0; right:0; width:auto; height:66px; padding:5px 7px max(5px,env(safe-area-inset-bottom)); border-right:0; border-top:1px solid var(--line); background:var(--panel); }.brand,.nav-label,.sidebar-bottom { display:none; }
+    nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
+    .topbar { height:55px; padding:0 18px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.topbar-actions { gap:11px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
+    .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
+    .records-section { margin-top:26px; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.page-footer { margin-top:28px; font-size:7px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
+</style>
