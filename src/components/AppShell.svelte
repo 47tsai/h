@@ -44,10 +44,10 @@
   let converterResults: { key: string; label: string; url: string }[] = [];
 
   const converterSources: Record<string, { label: string; domain: string; buildUrl: (id: string) => string }> = {
-    N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
-    W: { label: 'W 站', domain: 'w.com', buildUrl: (id) => `https://www.w.com/photos-slide-aid-${id}.html` },
-    JM: { label: 'JM 站', domain: 'jm.com', buildUrl: (id) => `https://jm.com/photo/${id}` },
-    P: { label: 'P 站', domain: 'p.com', buildUrl: (id) => `https://www.p.com/artworks/${id}` },
+    N: { label: 'N 站', domain: 'nhentai.net', buildUrl: (id) => `https://nhentai.net/g/${id}` },
+    W: { label: '紳士漫畫', domain: 'wnacg.com', buildUrl: (id) => `https://www.wnacg.com/photos-slide-aid-${id}.html` },
+    JM: { label: '禁漫天堂', domain: '18comic.vip', buildUrl: (id) => `https://18comic.vip/photo/${id}` },
+    P: { label: 'Pixiv', domain: 'pixiv.net', buildUrl: (id) => `https://www.pixiv.net/artworks/${id}` },
     M: { label: 'M 站', domain: 'm.com', buildUrl: (id) => `https://m.com/${encodeURIComponent(id.toLowerCase())}` },
     J: { label: 'J 站', domain: 'j.com', buildUrl: (id) => `https://j.com/videos/${encodeURIComponent(id.toLowerCase())}` },
   };
