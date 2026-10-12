@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import {
   deleteFavorite,
@@ -109,6 +109,21 @@ describe('IndexedDB favorites', () => {
     expect(await listFavorites()).toEqual([]);
     expect(await listStopwatchRecords()).toHaveLength(1);
   });
+  it('keeps deletion tombstones increasing if the system clock moves backwards', async () => {
+    await saveFavorite(sampleFavorite());
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValueOnce(1_000).mockReturnValueOnce(500);
+    try {
+      await deleteFavorite('favorite-1');
+      await deleteFavorite('favorite-1');
+    } finally {
+      now.mockRestore();
+    }
+
+    const tombstone = (await listSyncTombstones()).find((item) => item.key === 'favorites:favorite-1');
+    expect(tombstone?.deletedAt).toBe(1_001);
+  });
+
 });
 
 describe('atomic backup import', () => {
