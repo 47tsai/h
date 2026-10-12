@@ -420,6 +420,8 @@
               <option value="W">W站</option>
               <option value="JM">JM站</option>
               <option value="P">P站</option>
+              <option value="M">M站</option>
+              <option value="J">J站</option>
             </select>
             <div class="converter-input-wrap">
               <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }} placeholder="輸入編號或文字" aria-label="作品編號或文字" />
