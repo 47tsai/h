@@ -83,32 +83,35 @@
 
 ## TD-005：部署平台
 
-- 狀態：待決定
-- 候選：GitHub Pages、Cloudflare Pages
+- 狀態：待確認；已有建議方案
+- 候選：Cloudflare Workers 統一提供 Astro 靜態資產與同步 API，或 GitHub Pages + 獨立 Cloudflare Worker。
 
-### GitHub Pages
-
-優點：
-- 與 GitHub 儲存庫整合簡單。
-- 適合靜態前端部署。
-
-限制：
-- 需確認 Astro 輸出模式、路徑設定、網域與快取策略。
-- 不負責執行本專案的伺服器端同步邏輯；Worker 仍需獨立部署。
-
-### Cloudflare Pages
+### GitHub Pages + 獨立 Worker
 
 優點：
-- 與 Cloudflare Worker、網域及相關安全設定整合較直接。
-- 適合靜態前端搭配獨立 Worker API 的架構。
+- Astro 官方提供 GitHub Actions 部署流程。
+- 前端靜態託管與同步 API 分離，部署責任清楚。
 
 限制：
-- 需確認部署流程、建置設定與自訂網域設定。
-- 前端與 Worker 的部署責任仍應清楚分開。
+- 前端與 API 需分別設定部署、網域與跨來源存取。
+- 需留意 Astro 的 site/base 設定及子路徑。
+
+### Cloudflare Workers
+
+優點：
+- 可將靜態資產與 API 放在同一個平台管理。
+- 有機會讓前端與同步 API 使用同一個 Origin，降低 CORS 設定複雜度。
+- Astro 官方目前的 Cloudflare 部署指南指出，Cloudflare 對新專案建議使用 Workers。
+
+限制：
+- 需先驗證 Astro 輸出、靜態資產路由與 /api/sync 路由可正常共存。
+- 初次部署設定可能比純靜態 GitHub Pages 多一些平台設定。
 
 ### 建議
 
-如果沒有必須沿用 GitHub Pages 的理由，優先評估 Cloudflare Pages + 獨立 Worker，因為本專案已有 Cloudflare Worker 同步需求。最終選擇應以實際網域、現有部署習慣與建置測試為準。
+優先驗證 Cloudflare Workers 統一部署，但尚未標記為已決定。先完成最小 Astro 建置、靜態頁面與 API 路由驗證；若不順利，再評估 Cloudflare Pages + 獨立 Worker。
+
+詳細比較與官方參考見 [PHASE_0_DECISION_MATRIX.md](PHASE_0_DECISION_MATRIX.md)。
 
 ## TD-006：Cloudflare Worker 與 GitHub 同步
 
