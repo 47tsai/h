@@ -54,7 +54,7 @@ export function validateSourceRegistry(adapters: SourceAdapter[]): string[] {
 function safeHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname);
+    return (url.protocol === 'https:' || url.protocol === 'http:') && Boolean(url.hostname) && !url.username && !url.password;
   } catch {
     return false;
   }
