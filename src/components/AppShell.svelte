@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
   import { deleteFavorite, deleteStopwatchRecord, listFavorites, listStopwatchRecords, saveFavorite, saveStopwatchRecord, type FavoriteItem, type StopwatchRecord } from '../lib/storage';
+  import { convertInput } from '../lib/converter';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -200,9 +201,8 @@
   }
 
   function checkConverterInput() {
-    notice = converterInput.trim()
-      ? '來源清單尚未確認，目前不會猜測或產生不可靠的網址。'
-      : '先輸入編號，再進行檢查。';
+    const result = convertInput(converterInput, []);
+    notice = result.ok ? result.url : result.message;
   }
 
   onMount(() => {
