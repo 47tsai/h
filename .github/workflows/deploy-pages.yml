@@ -31,6 +31,8 @@ jobs:
       - name: Run tests
         run: npm test
       - name: Build Astro site
+        env:
+          PUBLIC_SYNC_WORKER_URL: ${{ vars.PUBLIC_SYNC_WORKER_URL }}
         run: npm run build
       - name: Preserve custom domain
         run: |
