@@ -65,7 +65,7 @@ function isTimestamp(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
-function isValidSyncDocument(value: unknown): value is SyncDocument {
+export function isValidSyncDocument(value: unknown): value is SyncDocument {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const document = value as Record<string, unknown>;
   if (document.schemaVersion !== 1 || typeof document.updatedAt !== 'string'
