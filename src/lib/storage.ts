@@ -109,7 +109,10 @@ export async function deleteStopwatchRecord(id: string): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(['stopwatch-records', 'sync-tombstones'], 'readwrite');
   await tx.objectStore('stopwatch-records').delete(id);
-  await tx.objectStore('sync-tombstones').put({ key: `stopwatchRecords:${id}`, entity: 'stopwatchRecords', id, deletedAt: Date.now() });
+  const tombstones = tx.objectStore('sync-tombstones');
+  const key = `stopwatchRecords:${id}`;
+  const current = await tombstones.get(key);
+  await tombstones.put({ key, entity: 'stopwatchRecords', id, deletedAt: Math.max(Date.now(), (current?.deletedAt ?? 0) + 1) });
   await tx.done;
 }
 
@@ -133,7 +136,10 @@ export async function deleteResultHistory(id: string): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(['result-history', 'sync-tombstones'], 'readwrite');
   await tx.objectStore('result-history').delete(id);
-  await tx.objectStore('sync-tombstones').put({ key: `resultHistory:${id}`, entity: 'resultHistory', id, deletedAt: Date.now() });
+  const tombstones = tx.objectStore('sync-tombstones');
+  const key = `resultHistory:${id}`;
+  const current = await tombstones.get(key);
+  await tombstones.put({ key, entity: 'resultHistory', id, deletedAt: Math.max(Date.now(), (current?.deletedAt ?? 0) + 1) });
   await tx.done;
 }
 
@@ -149,7 +155,10 @@ export async function deleteFavorite(id: string): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(['favorites', 'sync-tombstones'], 'readwrite');
   await tx.objectStore('favorites').delete(id);
-  await tx.objectStore('sync-tombstones').put({ key: `favorites:${id}`, entity: 'favorites', id, deletedAt: Date.now() });
+  const tombstones = tx.objectStore('sync-tombstones');
+  const key = `favorites:${id}`;
+  const current = await tombstones.get(key);
+  await tombstones.put({ key, entity: 'favorites', id, deletedAt: Math.max(Date.now(), (current?.deletedAt ?? 0) + 1) });
   await tx.done;
 }
 
