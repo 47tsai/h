@@ -58,6 +58,21 @@
     notice = '';
   }
 
+  async function pasteConverterInput() {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text) {
+        notice = '剪貼簿目前沒有文字。';
+        return;
+      }
+      converterInput = text.trim();
+      updateConverterOutput();
+      notice = '已貼上剪貼簿內容。';
+    } catch {
+      notice = '無法讀取剪貼簿，請確認瀏覽器權限後再試。';
+    }
+  }
+
   function randomConverter() {
     converterInput = String(Math.floor(Math.random() * 900000) + 100000);
     updateConverterOutput();
@@ -388,6 +403,7 @@
             <div class="converter-input-wrap">
               <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => updateConverterOutput()} inputmode="numeric" pattern="[0-9]*" placeholder="輸入編號" aria-label="作品編號" />
               <div class="converter-input-actions">
+                <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}>▤</button>
                 <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}>×</button>
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
