@@ -420,10 +420,9 @@
               </div>
             </div>
             <div class="converter-result-actions">
-              <button class="primary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>▧ 預覽</button>
-              <button class="secondary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>↗ 開啟</button>
+              <button class="secondary-button" disabled={!converterOutput} onclick={() => { notice = '目前只顯示來源與編號，尚未設定可開啟的頁面網址。'; }}>↗ 開啟</button>
             </div>
-            <div class="converter-preview-note"><span>ⓘ</span> 已設定四個來源的網域名稱。這裡目前顯示來源與編號，不會產生或開啟作品頁面網址。</div>
+            <div class="converter-preview-note"><span>ⓘ</span> 已移除預覽按鈕。結果目前僅顯示來源與編號，尚未連接作品頁面網址。</div>
           </div>
           <div class="converter-footer-actions">
             <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
