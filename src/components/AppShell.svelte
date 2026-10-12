@@ -628,9 +628,17 @@
           <div class="setting-row"><div><strong>清除本機資料</strong></div><button class="danger-button" disabled={dataBusy} onclick={() => void clearAllLocalData()}><Icon name="trash" size={15} /> 清除資料</button></div>
         </section>
         <section class="settings-card settings-sync-card">
-          <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">尚未部署</span></div>
-          
-          <div class="setting-row"><div><strong>同步</strong></div><button class="secondary-button" disabled title="同步服務尚未部署">立即同步</button></div>
+          <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">{syncWorkerUrl ? (lastSyncedAt ? '已連接' : '待同步') : '未設定'}</span></div>
+          {#if syncWorkerUrl}
+            <form class="sync-controls" onsubmit={(event) => { event.preventDefault(); void runCloudSync(); }}>
+              <input type="password" bind:value={syncPassword} autocomplete="current-password" placeholder="同步密碼" aria-label="同步密碼" />
+              <button class="secondary-button" type="submit" disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
+            </form>
+          {:else}
+            <div class="setting-row"><div><strong>尚未設定同步服務</strong></div><button class="secondary-button" disabled>立即同步</button></div>
+          {/if}
+          {#if lastSyncedAt}<p class="sync-last-success">上次同步：{new Date(lastSyncedAt).toLocaleString('zh-TW', { hour12: false })}</p>{/if}
+          {#if syncError}<p class="sync-error" role="alert">{syncError}</p>{/if}
         </section>
       {:else if activeSection === 'history'}
         <section class="page-heading"><div><h1>歷史紀錄</h1><p>開啟、複製或分享過的結果會自動整理在這裡。</p></div><span class="count-pill">{resultHistory.length} 筆</span></section>
