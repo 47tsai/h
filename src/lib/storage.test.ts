@@ -164,3 +164,58 @@ describe('atomic backup import', () => {
   });
 });
 
+describe('atomic single-item updates', () => {
+  it('preserves history identity and creation time when the same URL is recorded again', async () => {
+    const { recordResultAction } = await import('./storage');
+    await recordResultAction({
+      id: 'history-original',
+      url: 'https://example.com/item/alpha',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open',
+      lastActionAt: 100,
+      createdAt: 50,
+    });
+    await recordResultAction({
+      id: 'history-new',
+      url: 'https://example.com/item/alpha',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'copy',
+      lastActionAt: 200,
+      createdAt: 200,
+    });
+
+    const history = await listResultHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      id: 'history-original',
+      createdAt: 50,
+      lastAction: 'copy',
+      lastActionAt: 200,
+    });
+  });
+
+  it('keeps the newest tombstone when an older deletion arrives later', async () => {
+    const { saveSyncTombstone } = await import('./storage');
+    await saveSyncTombstone({
+      key: 'favorites:favorite-x',
+      entity: 'favorites',
+      id: 'favorite-x',
+      deletedAt: 500,
+    });
+    await saveSyncTombstone({
+      key: 'favorites:favorite-x',
+      entity: 'favorites',
+      id: 'favorite-x',
+      deletedAt: 300,
+    });
+
+    expect(await listSyncTombstones()).toContainEqual({
+      key: 'favorites:favorite-x',
+      entity: 'favorites',
+      id: 'favorite-x',
+      deletedAt: 500,
+    });
+  });
+});
