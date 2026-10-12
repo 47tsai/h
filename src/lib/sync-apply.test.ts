@@ -110,4 +110,35 @@ describe('applying cloud sync results', () => {
       deletedAt: expect.any(Number),
     });
   });
+
+  it('retries when local data changes while the sync request is in flight', async () => {
+    const newFavorite = {
+      id: 'added-during-sync',
+      url: 'https://example.com/added-during-sync',
+      title: 'Added while syncing',
+      createdAt: 300,
+      updatedAt: 300,
+    };
+    let calls = 0;
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      calls += 1;
+      const payload = JSON.parse(String(init?.body));
+      if (calls === 1) {
+        await saveFavorite(newFavorite);
+      }
+      return new Response(JSON.stringify({
+        ok: true,
+        syncedAt: '2026-10-12T12:01:00.000Z',
+        document: payload.document,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await syncWithCloud('https://sync.example.com', 'dark');
+
+    expect(calls).toBe(2);
+    expect(await listFavorites()).toEqual([newFavorite]);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).document.favorites).toEqual([newFavorite]);
+  });
+
 });
