@@ -76,6 +76,12 @@ describe('sync Worker request validation', () => {
     expect((await send(favoriteConflict)).status).toBe(400);
   });
 
+  it('rejects documents without the settings object required by the client', async () => {
+    const missingSettings = validDocument();
+    delete missingSettings.settings;
+    expect((await send(missingSettings)).status).toBe(400);
+  });
+
   it('rejects non-JSON requests without trying to sync', async () => {
     const response = await worker.fetch(new Request('https://sync.example.com/api/sync', {
       method: 'POST',
