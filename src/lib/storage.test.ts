@@ -34,11 +34,12 @@ const sampleFavorite = (overrides: Partial<FavoriteItem> = {}): FavoriteItem => 
 async function clearDatabase() {
   // Let the production storage module create and migrate the current schema before cleanup.
   await listStopwatchRecords();
-  const db = await openDB('h-tools', 3);
+  const db = await openDB('h-tools', 4);
   await Promise.all([
     db.clear('stopwatch-records'),
     db.clear('favorites'),
     db.clear('result-history'),
+    db.clear('sync-tombstones'),
   ]);
   db.close();
 }
