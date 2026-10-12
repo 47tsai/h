@@ -281,7 +281,10 @@ export default {
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    // Temporary test mode: bypass password verification to test sync end to end.
+    const passwordHash = env.SYNC_PASSWORD_HASH;
+    if (!passwordHash || !(await verifyPassword(payload.password, passwordHash))) {
+      return fail('AUTH_FAILED', 401, allowedOrigin);
+    }
     if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
     if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
