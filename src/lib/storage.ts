@@ -162,16 +162,16 @@ export async function importBackupData(
   importedHistory: ResultHistoryItem[],
   importedFavorites: FavoriteItem[],
 ): Promise<void> {
-  if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)) {
-    throw new Error('備份資料結構不正確。');
+  if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)
+    || importedRecords.length > 10000 || importedHistory.length > 10000 || importedFavorites.length > 10000) {
+    throw new Error('備份資料結構不正確，或單一類型資料超過 10,000 筆。');
   }
-  const hasValidId = (item: unknown): item is { id: string } => Boolean(item && typeof item === 'object'
-    && typeof (item as { id?: unknown }).id === 'string'
-    && (item as { id: string }).id.trim().length > 0
-    && (item as { id: string }).id.length <= 200);
-  const hasValidUrl = (item: unknown): item is { id: string; url: string } => {
-    if (!hasValidId(item)) return false;
-    const value = (item as { url?: unknown }).url;
+  const isObject = (item: unknown): item is Record<string, unknown> =>
+    Boolean(item && typeof item === 'object' && !Array.isArray(item));
+  const hasValidId = (item: unknown): item is Record<string, unknown> =>
+    isObject(item) && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200;
+  const isTimestamp = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
+  const isSafeHttpUrl = (value: unknown): value is string => {
     if (typeof value !== 'string' || value.length > 4096) return false;
     try {
       const url = new URL(value);
@@ -181,12 +181,28 @@ export async function importBackupData(
       return false;
     }
   };
+  const validRecord = (value: unknown): value is StopwatchRecord => hasValidId(value)
+    && typeof value.title === 'string' && value.title.length <= 500
+    && isTimestamp(value.startedAt) && isTimestamp(value.endedAt)
+    && isTimestamp(value.durationMs) && isTimestamp(value.createdAt);
+  const validHistory = (value: unknown): value is ResultHistoryItem => hasValidId(value)
+    && isSafeHttpUrl(value.url)
+    && typeof value.source === 'string' && value.source.length <= 200
+    && typeof value.sourceLabel === 'string' && value.sourceLabel.length <= 500
+    && ['open', 'copy', 'share'].includes(String(value.lastAction))
+    && isTimestamp(value.lastActionAt) && isTimestamp(value.createdAt);
+  const validFavorite = (value: unknown): value is FavoriteItem => hasValidId(value)
+    && isSafeHttpUrl(value.url)
+    && typeof value.title === 'string' && value.title.length <= 500
+    && (value.source === undefined || (typeof value.source === 'string' && value.source.length <= 200))
+    && (value.notes === undefined || (typeof value.notes === 'string' && value.notes.length <= 5000))
+    && isTimestamp(value.createdAt) && isTimestamp(value.updatedAt);
   const hasUniqueIds = (items: { id: string }[]) => new Set(items.map((item) => item.id)).size === items.length;
   const hasUniqueUrls = (items: { url: string }[]) => new Set(items.map((item) => item.url)).size === items.length;
-  if (!importedRecords.every(hasValidId) || !importedHistory.every(hasValidUrl) || !importedFavorites.every(hasValidUrl)
+  if (!importedRecords.every(validRecord) || !importedHistory.every(validHistory) || !importedFavorites.every(validFavorite)
     || !hasUniqueIds(importedRecords) || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
     || !hasUniqueUrls(importedHistory) || !hasUniqueUrls(importedFavorites)) {
-    throw new Error('備份包含無效或重複的 ID／網址，未匯入任何內容。');
+    throw new Error('備份包含無效或重複的欄位、ID 或網址，未匯入任何內容。');
   }
 
   const db = await getDatabase();
