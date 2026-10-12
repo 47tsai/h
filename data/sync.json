@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-12T09:02:46.160Z",
+  "settings": {
+    "theme": "system"
+  },
+  "tombstones": [],
+  "stopwatchRecords": [
+    {
+      "id": "3f19cfcc-de71-4415-8ae1-ceb27e191c83",
+      "startedAt": 1791792015553,
+      "endedAt": 1791792879866,
+      "durationMs": 864313,
+      "title": "2026/10/12 16:00:15",
+      "createdAt": 1791792879866
+    }
+  ],
+  "resultHistory": [],
+  "favorites": []
+}
