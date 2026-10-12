@@ -4,6 +4,7 @@
   import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
   import { convertInput } from '../lib/converter';
   import Icon from './Icon.svelte';
+  import { syncWithCloud } from '../lib/sync';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -335,7 +336,38 @@
 
   let importFileInput: HTMLInputElement | undefined;
   let dataBusy = false;
+  let syncPassword = '';
+  let syncBusy = false;
+  let syncError = '';
+  let lastSyncedAt = '';
+  const syncWorkerUrl = (import.meta.env.PUBLIC_SYNC_WORKER_URL ?? '').trim();
   const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
+
+  async function runCloudSync() {
+    if (!syncWorkerUrl || !syncPassword.trim() || syncBusy) return;
+    syncBusy = true;
+    syncError = '';
+    notice = '';
+    try {
+      const result = await syncWithCloud(syncWorkerUrl, syncPassword, theme);
+      lastSyncedAt = result.syncedAt;
+      try { localStorage.setItem('h-tools-last-synced-at', result.syncedAt); } catch { /* Status remains available for this session. */ }
+      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
+        listStopwatchRecords(), listResultHistory(), listFavorites(),
+      ]);
+      records = savedRecords;
+      resultHistory = savedHistory;
+      favorites = savedFavorites;
+      const remoteTheme = result.document.settings?.theme;
+      if (remoteTheme === 'system' || remoteTheme === 'light' || remoteTheme === 'dark') applyTheme(remoteTheme);
+      notice = '同步完成。';
+    } catch (error) {
+      syncError = error instanceof Error ? error.message : '同步失敗，請稍後再試。';
+    } finally {
+      syncPassword = '';
+      syncBusy = false;
+    }
+  }
 
   async function exportBackup() {
     dataBusy = true;
@@ -511,6 +543,7 @@
     } catch {
       storageError = '讀取本機設定失敗，部分狀態可能已重設。';
     }
+    try { lastSyncedAt = localStorage.getItem('h-tools-last-synced-at') ?? ''; } catch { /* Sync status is optional. */ }
     updateTheme();
     const media = window.matchMedia('(prefers-color-scheme: light)');
     const onThemeChange = () => { if (theme === 'system') updateTheme(); };
@@ -727,6 +760,7 @@
   .setting-action { display:flex; align-items:center; gap:8px; }.visually-hidden-file { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }.danger-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 12px; border:1px solid #ff8f9b55; border-radius:9px; color:#ff9aa5; background:#ff8f9b0b; font-size:10px; cursor:pointer; white-space:nowrap; }.danger-button:hover:not(:disabled) { background:#ff8f9b18; border-color:#ff8f9b88; }.danger-button:disabled { opacity:.45; cursor:not-allowed; }.setting-row .secondary-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }
   .sync-explainer { display:flex; gap:12px; align-items:flex-start; padding:18px 0 4px; }.sync-status-icon { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); color:var(--muted); }.sync-explainer strong { font-size:11px; }.sync-explainer p { margin:6px 0 0; max-width:640px; color:var(--muted); font-size:10px; line-height:1.8; }
   .settings-sync-card .settings-section-heading { border-bottom:0; }.settings-sync-card .setting-row { margin-top:8px; }
+  .sync-controls { display:flex; align-items:center; gap:10px; padding:14px 0 6px; }.sync-controls input { min-width:0; flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:9px; background:var(--bg); color:var(--text); font:inherit; font-size:11px; outline:none; }.sync-controls input:focus { border-color:var(--accent); }.sync-last-success,.sync-error { margin:8px 0 14px; font-size:10px; line-height:1.6; }.sync-last-success { color:var(--muted); }.sync-error { color:#ff9aa5; }
 
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:16px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
