@@ -4,7 +4,7 @@ compatibility_date = "2026-10-12"
 
 [vars]
 GITHUB_OWNER = "tsai97216"
-GITHUB_REPO = "REPLACE_WITH_PRIVATE_SYNC_REPO"
+GITHUB_REPO = "h"
 GITHUB_BRANCH = "main"
 GITHUB_FILE_PATH = "data/sync.json"
 ALLOWED_ORIGIN = "https://h.chi.qzz.io"
