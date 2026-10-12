@@ -39,7 +39,7 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(badTimestamp)).toBe(false);
 
     const badSettings = validDocument();
-    badSettings.settings = { theme: 'dark', token: 'unexpected' };
+    Object.assign(badSettings.settings, { token: 'unexpected' });
     expect(isValidSyncDocument(badSettings)).toBe(false);
   });
 
