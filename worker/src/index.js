@@ -126,6 +126,19 @@ function mergeDocuments(local, remote) {
       if (!current || itemTimestamp(entity, item) > itemTimestamp(entity, current)) byId.set(item.id, item);
     }
     let items = [...byId.values()];
+    if (entity === 'favorites') {
+      const byUrl = new Map();
+      for (const item of items) {
+        const current = byUrl.get(item.url);
+        if (!current) byUrl.set(item.url, item);
+        else if (item.updatedAt > current.updatedAt) {
+          byUrl.set(item.url, { ...item, id: current.id, createdAt: Math.min(item.createdAt, current.createdAt) });
+        } else {
+          byUrl.set(item.url, { ...current, createdAt: Math.min(item.createdAt, current.createdAt) });
+        }
+      }
+      items = [...byUrl.values()];
+    }
     if (entity === 'resultHistory') {
       const byUrl = new Map();
       for (const item of items) {
@@ -279,6 +292,9 @@ export default {
         const remote = await githubRequest(env, 'GET');
         const merged = mergeDocuments(local, remote.document);
         if (!validateDocument(merged)) return fail('BAD_REQUEST', 400, allowedOrigin);
+        if (new TextEncoder().encode(JSON.stringify(merged)).byteLength > MAX_BODY_BYTES) {
+          return fail('PAYLOAD_TOO_LARGE', 413, allowedOrigin);
+        }
         try {
           const saved = await githubRequest(env, 'PUT', merged, remote.sha);
           return json({ ok: true, document: merged, sha: saved.sha, syncedAt: new Date().toISOString() }, 200, allowedOrigin);
