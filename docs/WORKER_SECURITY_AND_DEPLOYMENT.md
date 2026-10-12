@@ -1,6 +1,6 @@
 # Worker 安全與部署規格
 
-> 狀態：規劃中，尚未實作。本文定義前端透過 Cloudflare Worker 手動同步到私人 GitHub 儲存庫的安全邊界與部署要求。
+> 狀態：Worker 程式已建立；私人資料庫、Secrets 與正式部署尚未完成。本文定義前端透過 Cloudflare Worker 手動同步到私人 GitHub 儲存庫的安全邊界與部署要求。
 
 ## 1. 設計目標
 
