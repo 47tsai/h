@@ -210,6 +210,27 @@ export async function applySyncSnapshotIfUnchanged(
     return false;
   }
 
+  const tombstonesToWrite = new Map(next.tombstones.map((item) => [item.key, item]));
+  const nextIds = {
+    stopwatchRecords: new Set(next.stopwatchRecords.map((item) => item.id)),
+    resultHistory: new Set(next.resultHistory.map((item) => item.id)),
+    favorites: new Set(next.favorites.map((item) => item.id)),
+  };
+  const preserveRemovedId = (entity: SyncEntity, id: string) => {
+    if (nextIds[entity].has(id)) return;
+    const key = entity + ':' + id;
+    const existing = tombstonesToWrite.get(key);
+    tombstonesToWrite.set(key, {
+      key,
+      entity,
+      id,
+      deletedAt: Math.max(Date.now(), (existing?.deletedAt ?? 0) + 1),
+    });
+  };
+  for (const item of records) preserveRemovedId('stopwatchRecords', item.id);
+  for (const item of history) preserveRemovedId('resultHistory', item.id);
+  for (const item of favorites) preserveRemovedId('favorites', item.id);
+
   await Promise.all([
     recordsStore.clear(),
     historyStore.clear(),
@@ -220,7 +241,7 @@ export async function applySyncSnapshotIfUnchanged(
     ...next.stopwatchRecords.map((item) => recordsStore.put(item)),
     ...next.resultHistory.map((item) => historyStore.put(item)),
     ...next.favorites.map((item) => favoritesStore.put(item)),
-    ...next.tombstones.map((item) => tombstonesStore.put(item)),
+    ...[...tombstonesToWrite.values()].map((item) => tombstonesStore.put(item)),
   ]);
   await tx.done;
   return true;
