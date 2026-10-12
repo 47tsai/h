@@ -76,6 +76,20 @@ describe('sync Worker request validation', () => {
     expect((await send(favoriteConflict)).status).toBe(400);
   });
 
+  it('rejects unknown fields in sync documents and records', async () => {
+    const extraTopLevel = validDocument();
+    extraTopLevel.unexpected = true;
+    expect((await send(extraTopLevel)).status).toBe(400);
+
+    const extraRecordField = validDocument();
+    extraRecordField.stopwatchRecords[0].unexpected = true;
+    expect((await send(extraRecordField)).status).toBe(400);
+
+    const extraTombstoneField = validDocument();
+    extraTombstoneField.tombstones[0].unexpected = true;
+    expect((await send(extraTombstoneField)).status).toBe(400);
+  });
+
   it('rejects documents without the settings object required by the client', async () => {
     const missingSettings = validDocument();
     delete missingSettings.settings;
