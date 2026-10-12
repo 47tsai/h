@@ -182,7 +182,7 @@
 
   function startStopwatchTick() {
     if (tick) return;
-    tick = setInterval(() => { now = Date.now(); }, 100);
+    tick = setInterval(() => { now = Date.now(); }, 1000);
   }
 
   function stopStopwatchTick() {
