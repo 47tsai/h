@@ -333,6 +333,166 @@
     updateTheme();
   }
 
+  let importFileInput: HTMLInputElement | undefined;
+  let dataBusy = false;
+  const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
+
+  async function exportBackup() {
+    dataBusy = true;
+    storageError = '';
+    try {
+      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
+        listStopwatchRecords(), listResultHistory(), listFavorites(),
+      ]);
+      records = savedRecords;
+      resultHistory = savedHistory;
+      favorites = savedFavorites;
+      const backup = {
+        format: 'h-tools-backup',
+        schemaVersion: 1,
+        exportedAt: new Date().toISOString(),
+        settings: { theme },
+        stopwatchRecords: savedRecords,
+        resultHistory: savedHistory,
+        favorites: savedFavorites,
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'h-tools-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      notice = '備份已匯出，請妥善保存 JSON 檔案。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '匯出備份失敗。';
+    } finally {
+      dataBusy = false;
+    }
+  }
+
+  function isSafeHttpUrl(value: unknown): value is string {
+    if (typeof value !== 'string' || value.length > 4096) return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === 'https:' || url.protocol === 'http:';
+    } catch { return false; }
+  }
+
+  async function importBackup(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    dataBusy = true;
+    storageError = '';
+    try {
+      if (file.size > MAX_BACKUP_BYTES) throw new Error('備份檔超過 10 MB，無法匯入。');
+      const parsed: unknown = JSON.parse(await file.text());
+      if (!parsed || typeof parsed !== 'object') throw new Error('備份檔格式不正確。');
+      const backup = parsed as Record<string, unknown>;
+      if (backup.format !== 'h-tools-backup' || backup.schemaVersion !== 1) throw new Error('不支援這個備份格式或版本。');
+      const importedRecords = backup.stopwatchRecords;
+      const importedHistory = backup.resultHistory;
+      const importedFavorites = backup.favorites;
+      if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)
+        || importedRecords.length > 10000 || importedHistory.length > 10000 || importedFavorites.length > 10000) {
+        throw new Error('備份資料結構不正確，或單一類型資料超過 10,000 筆。');
+      }
+      const validRecords = importedRecords.every((value) => {
+        if (!value || typeof value !== 'object') return false;
+        const item = value as Record<string, unknown>;
+        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+          && typeof item.title === 'string' && item.title.length <= 500
+          && ['startedAt', 'endedAt', 'durationMs', 'createdAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+      });
+      const validHistory = importedHistory.every((value) => {
+        if (!value || typeof value !== 'object') return false;
+        const item = value as Record<string, unknown>;
+        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+          && isSafeHttpUrl(item.url) && typeof item.source === 'string' && item.source.length <= 200
+          && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
+          && ['open', 'copy', 'share'].includes(String(item.lastAction))
+          && ['lastActionAt', 'createdAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+      });
+      const validFavorites = importedFavorites.every((value) => {
+        if (!value || typeof value !== 'object') return false;
+        const item = value as Record<string, unknown>;
+        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+          && isSafeHttpUrl(item.url) && typeof item.title === 'string' && item.title.length <= 500
+          && (item.notes === undefined || (typeof item.notes === 'string' && item.notes.length <= 5000))
+          && ['createdAt', 'updatedAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+      });
+      if (!validRecords || !validHistory || !validFavorites) throw new Error('備份包含無效資料，未匯入任何內容。');
+      if (!window.confirm(`即將合併備份資料：${importedRecords.length} 筆碼錶、${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
+
+      for (const rawItem of importedRecords) await saveStopwatchRecord(rawItem as StopwatchRecord);
+      const currentHistory = await listResultHistory();
+      for (const rawItem of importedHistory) {
+        const item = rawItem as ResultHistoryItem;
+        const existingByUrl = currentHistory.find((current) => current.url === item.url);
+        const idInUse = currentHistory.some((current) => current.id === item.id && current.url !== item.url);
+        await recordResultAction({
+          ...item,
+          id: existingByUrl?.id ?? (idInUse ? crypto.randomUUID() : item.id),
+          createdAt: existingByUrl?.createdAt ?? item.createdAt,
+        });
+      }
+      let currentFavorites = await listFavorites();
+      for (const rawItem of importedFavorites) {
+        const item = rawItem as FavoriteItem;
+        const existingByUrl = currentFavorites.find((current) => current.url === item.url);
+        const idInUse = currentFavorites.some((current) => current.id === item.id && current.url !== item.url);
+        const saved: FavoriteItem = {
+          ...item,
+          id: existingByUrl?.id ?? (idInUse ? crypto.randomUUID() : item.id),
+          createdAt: existingByUrl?.createdAt ?? item.createdAt,
+        };
+        await saveFavorite(saved);
+        currentFavorites = [...currentFavorites.filter((current) => current.id !== saved.id && current.url !== saved.url), saved];
+      }
+      records = await listStopwatchRecords();
+      resultHistory = await listResultHistory();
+      favorites = await listFavorites();
+      const importedTheme = (backup.settings as { theme?: unknown } | undefined)?.theme;
+      if (importedTheme === 'system' || importedTheme === 'light' || importedTheme === 'dark') applyTheme(importedTheme);
+      notice = '備份匯入完成，現有資料已與備份合併。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '匯入備份失敗。';
+    } finally {
+      dataBusy = false;
+      input.value = '';
+    }
+  }
+
+  async function clearAllLocalData() {
+    if (!window.confirm('確定刪除此裝置上的所有碼錶紀錄、歷史紀錄、收藏與進行中的碼錶狀態？此操作無法復原，請先匯出備份。')) return;
+    dataBusy = true;
+    storageError = '';
+    try {
+      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
+        listStopwatchRecords(), listResultHistory(), listFavorites(),
+      ]);
+      for (const item of savedRecords) await deleteStopwatchRecord(item.id);
+      for (const item of savedHistory) await deleteResultHistory(item.id);
+      for (const item of savedFavorites) await deleteFavorite(item.id);
+      try { localStorage.removeItem('h-tools-stopwatch-active'); } catch { /* Other data was still deleted. */ }
+      runningState = null;
+      records = [];
+      resultHistory = [];
+      favorites = [];
+      notice = '已清除本機資料，介面主題設定仍保留。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '清除資料失敗，請重新載入後檢查資料狀態。';
+      records = await listStopwatchRecords().catch(() => records);
+      resultHistory = await listResultHistory().catch(() => resultHistory);
+      favorites = await listFavorites().catch(() => favorites);
+    } finally {
+      dataBusy = false;
+    }
+  }
+
   function checkConverterInput() {
     const result = convertInput(converterInput, []);
     notice = result.ok ? result.url : result.message;
@@ -422,11 +582,22 @@
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol"><Icon name="timer" size={20} /></div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}><Icon name="trash" size={16} /></button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'settings'}
-        <section class="page-heading"><h1>設定</h1></section>
+        <section class="page-heading"><div><h1>設定</h1><p>管理外觀、本機資料備份，以及跨裝置同步。</p></div></section>
         <section class="settings-card">
-          <div class="setting-row"><div><strong>介面主題</strong></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
-          <div class="setting-row"><div><strong>資料保存</strong><p>儲存於此裝置的瀏覽器。</p></div></div>
-          <div class="setting-row"><div><strong>雲端同步</strong></div><span class="setting-badge muted">尚未啟用</span></div>
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="settings" size={18} /></div><div><h2>外觀</h2><p>依照使用環境調整介面顯示。</p></div></div>
+          <div class="setting-row"><div><strong>介面主題</strong><p>系統模式會跟隨裝置的外觀設定。</p></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" aria-pressed={theme === option.id} onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
+        </section>
+        <section class="settings-card settings-data-card">
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="copy" size={18} /></div><div><h2>資料管理</h2><p>資料目前保存在這個瀏覽器的 IndexedDB。清除瀏覽器網站資料也可能移除它們。</p></div></div>
+          <div class="settings-data-stats"><div><strong>{records.length}</strong><span>碼錶紀錄</span></div><div><strong>{resultHistory.length}</strong><span>歷史紀錄</span></div><div><strong>{favorites.length}</strong><span>收藏</span></div></div>
+          <div class="setting-row"><div><strong>匯出備份</strong><p>下載包含碼錶、歷史、收藏與主題偏好的 JSON 檔案，方便轉移或還原資料。</p></div><button class="secondary-button" disabled={dataBusy} onclick={() => void exportBackup()}><Icon name="external-link" size={15} /> 匯出 JSON</button></div>
+          <div class="setting-row"><div><strong>匯入備份</strong><p>匯入前會檢查檔案格式。資料會與現有內容合併，不會直接清空整個資料庫。</p></div><div class="setting-action"><input bind:this={importFileInput} class="visually-hidden-file" type="file" accept="application/json,.json" aria-label="選擇 H Tools 備份檔" onchange={importBackup} /><button class="secondary-button" disabled={dataBusy} onclick={() => importFileInput?.click()}><Icon name="paste" size={15} /> 選擇備份檔</button></div></div>
+          <div class="setting-row"><div><strong>清除本機資料</strong><p>刪除碼錶、歷史、收藏與進行中的碼錶狀態。主題偏好會保留，這項操作無法復原。</p></div><button class="danger-button" disabled={dataBusy} onclick={() => void clearAllLocalData()}><Icon name="trash" size={15} /> 清除資料</button></div>
+        </section>
+        <section class="settings-card settings-sync-card">
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="history" size={18} /></div><div><h2>雲端同步</h2><p>規劃為手動雙向同步，讓不同裝置可以合併資料。</p></div><span class="setting-badge muted">尚未部署</span></div>
+          <div class="sync-explainer"><div class="sync-status-icon"><Icon name="history" size={20} /></div><div><strong>同步服務尚未連接</strong><p>目前資料只存在本機，不能直接跨裝置同步。要安全啟用同步，還需要部署 Cloudflare Worker、設定伺服器端密鑰，並連接私人 GitHub 儲存庫。同步密碼與 GitHub Token 不會放進前端。</p></div></div>
+          <div class="setting-row"><div><strong>同步方式</strong><p>手動觸發；同步成功後才更新狀態，不會在背景偷偷上傳。</p></div><button class="secondary-button" disabled title="同步服務尚未部署">立即同步</button></div>
         </section>
       {:else if activeSection === 'history'}
         <section class="page-heading"><div><h1>歷史紀錄</h1><p>開啟、複製或分享過的結果會自動整理在這裡。</p></div><span class="count-pill">{resultHistory.length} 筆</span></section>
@@ -550,7 +721,13 @@
   .record-symbol { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border:1px solid var(--line); border-radius:10px; color:var(--accent); background:var(--panel-2); font-size:17px; }.record-info { min-width:0; flex:1; }.record-info strong { display:block; font-size:11px; font-weight:600; overflow-wrap:anywhere; }.record-info small { display:block; margin-top:5px; font-size:9px; color:var(--muted); }
   .record-duration { font-size:12px; font-variant-numeric:tabular-nums; letter-spacing:.03em; }.delete-button { width:27px; height:27px; border:1px solid transparent; background:transparent; color:var(--muted); border-radius:7px; font-size:19px; cursor:pointer; }.delete-button:hover { color:#ff8f9b; border-color:#ff8f9b35; }
   .empty-state { min-height:164px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:25px 15px; }.empty-icon { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px; color:var(--accent); background:var(--panel-2); font-size:20px; margin-bottom:3px; }.empty-state strong { font-size:11px; font-weight:600; }.empty-state span { font-size:10px; color:var(--muted); line-height:1.6; }
-  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-group { margin-bottom:22px; }.favorite-group .section-heading { margin:18px 0 10px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
+  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-group { margin-bottom:22px; }.favorite-group .section-heading { margin:18px 0 10px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; margin-bottom:16px; }
+  .settings-section-heading { display:flex; align-items:center; gap:12px; padding:19px 0 16px; border-bottom:1px solid var(--line); }.settings-section-heading > div:nth-child(2) { flex:1; min-width:0; }.settings-section-heading h2 { margin:0; font-size:13px; font-weight:650; }.settings-section-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.7; }.settings-section-icon { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); color:var(--accent); }
+  .settings-data-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:16px 0 4px; }.settings-data-stats > div { display:flex; flex-direction:column; gap:5px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }.settings-data-stats strong { font-size:20px; font-variant-numeric:tabular-nums; }.settings-data-stats span { color:var(--muted); font-size:10px; }
+  .setting-action { display:flex; align-items:center; gap:8px; }.visually-hidden-file { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }.danger-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 12px; border:1px solid #ff8f9b55; border-radius:9px; color:#ff9aa5; background:#ff8f9b0b; font-size:10px; cursor:pointer; white-space:nowrap; }.danger-button:hover:not(:disabled) { background:#ff8f9b18; border-color:#ff8f9b88; }.danger-button:disabled { opacity:.45; cursor:not-allowed; }.setting-row .secondary-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }
+  .sync-explainer { display:flex; gap:12px; align-items:flex-start; padding:18px 0 4px; }.sync-status-icon { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); color:var(--muted); }.sync-explainer strong { font-size:11px; }.sync-explainer p { margin:6px 0 0; max-width:640px; color:var(--muted); font-size:10px; line-height:1.8; }
+  .settings-sync-card .settings-section-heading { border-bottom:0; }.settings-sync-card .setting-row { margin-top:8px; }
+
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
   .setting-badge { border:1px solid #62d8a32a; color:#62d8a3; background:#62d8a30b; border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
@@ -573,7 +750,7 @@
     nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
     .topbar { height:55px; padding:0 18px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.topbar-actions { gap:11px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
     .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
-    .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
+    .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.settings-data-stats { gap:6px; }.settings-data-stats > div { padding:9px 7px; }.settings-data-stats strong { font-size:17px; }.settings-section-heading { align-items:flex-start; flex-wrap:wrap; }.settings-section-heading > .setting-badge { margin-left:48px; }.setting-action,.setting-row .secondary-button,.danger-button { max-width:100%; }.sync-explainer { gap:9px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 
