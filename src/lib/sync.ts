@@ -116,13 +116,30 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
       && item.key === String(item.entity) + ':' + item.id && isTimestamp(item.deletedAt);
   };
 
+  const hasUniqueValues = (items: unknown[], getValue: (item: Record<string, unknown>) => unknown) => {
+    const values = new Set<unknown>();
+    for (const item of items) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) return false;
+      const value = getValue(item as Record<string, unknown>);
+      if (values.has(value)) return false;
+      values.add(value);
+    }
+    return true;
+  };
+
   return document.stopwatchRecords.length <= 10000
     && document.resultHistory.length <= 10000 && document.favorites.length <= 10000
     && document.tombstones.length <= 30000
     && document.stopwatchRecords.every(validRecord)
     && document.resultHistory.every(validHistoryItem)
     && document.favorites.every(validFavorite)
-    && document.tombstones.every(validTombstone);
+    && document.tombstones.every(validTombstone)
+    && hasUniqueValues(document.stopwatchRecords, (item) => item.id)
+    && hasUniqueValues(document.resultHistory, (item) => item.id)
+    && hasUniqueValues(document.resultHistory, (item) => item.url)
+    && hasUniqueValues(document.favorites, (item) => item.id)
+    && hasUniqueValues(document.favorites, (item) => item.url)
+    && hasUniqueValues(document.tombstones, (item) => item.key);
 }
 
 function validateResponse(value: unknown): value is { ok: true; document: SyncDocument; syncedAt: string } {
