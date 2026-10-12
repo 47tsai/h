@@ -1,0 +1,45 @@
+name: Deploy Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - '.github/workflows/deploy-worker.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Hash sync password
+        id: password
+        env:
+          SYNC_PASSWORD: ${{ secrets.SYNC_PASSWORD }}
+        run: node worker/scripts/hash-sync-password.mjs
+      - name: Deploy Worker and set runtime secrets
+        uses: cloudflare/wrangler-action@v3
+        with:
+          workingDirectory: worker
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+          secrets: |
+            GITHUB_TOKEN
+            SYNC_PASSWORD_HASH
+        env:
+          GITHUB_TOKEN: ${{ secrets.SYNC_GITHUB_TOKEN }}
+          SYNC_PASSWORD_HASH: ${{ steps.password.outputs.hash }}
