@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-12T10:18:25.490Z",
+  "updatedAt": "2026-10-12T10:49:24.993Z",
   "settings": {
     "theme": "system"
   },
@@ -10,6 +10,18 @@
       "entity": "stopwatchRecords",
       "id": "61461320-ada0-4fc7-b5b6-90f561bec0e6",
       "deletedAt": 1791800279989
+    },
+    {
+      "key": "resultHistory:02592bfc-cda5-4f70-b525-9caa78183434",
+      "entity": "resultHistory",
+      "id": "02592bfc-cda5-4f70-b525-9caa78183434",
+      "deletedAt": 1791801325441
+    },
+    {
+      "key": "resultHistory:54fa2358-a6be-4937-a5e5-2127a9359047",
+      "entity": "resultHistory",
+      "id": "54fa2358-a6be-4937-a5e5-2127a9359047",
+      "deletedAt": 1791801324445
     }
   ],
   "stopwatchRecords": [
@@ -20,6 +32,14 @@
       "durationMs": 864313,
       "title": "2026/10/12 16:00:15",
       "createdAt": 1791792879866
+    },
+    {
+      "id": "d775a15d-f7d5-440c-9fc8-f10f09185f12",
+      "startedAt": 1791800298286,
+      "endedAt": 1791801972564,
+      "durationMs": 1674278,
+      "title": "2026/10/12 18:18:18",
+      "createdAt": 1791801972564
     }
   ],
   "resultHistory": [
@@ -28,10 +48,91 @@
       "url": "https://18comic.vip/photo/1459184",
       "source": "JM",
       "sourceLabel": "禁漫天堂",
-      "lastAction": "copy",
-      "lastActionAt": 1791800263612,
+      "lastAction": "open",
+      "lastActionAt": 1791800312022,
       "createdAt": 1791800245977
+    },
+    {
+      "id": "4782253c-75b3-4728-a4a5-7b2e2d081e59",
+      "url": "https://m.com/ebwh-353",
+      "source": "M",
+      "sourceLabel": "M 站",
+      "lastAction": "open",
+      "lastActionAt": 1791801667081,
+      "createdAt": 1791801661606
+    },
+    {
+      "id": "5caffa31-a8a7-4a11-be1c-e477601b0fe1",
+      "url": "https://www.wnacg.com/photos-slide-aid-232097.html",
+      "source": "W",
+      "sourceLabel": "紳士漫畫",
+      "lastAction": "open",
+      "lastActionAt": 1791801536790,
+      "createdAt": 1791801536790
+    },
+    {
+      "id": "4dd6ae3d-92e0-4f56-9706-2c3f8d5a5baf",
+      "url": "https://nhentai.net/g/232097",
+      "source": "N",
+      "sourceLabel": "N 站",
+      "lastAction": "open",
+      "lastActionAt": 1791801522749,
+      "createdAt": 1791801522749
+    },
+    {
+      "id": "ebbff117-222c-4cc0-9477-526b7da856f1",
+      "url": "https://18comic.vip/photo/1422693",
+      "source": "JM",
+      "sourceLabel": "禁漫天堂",
+      "lastAction": "open",
+      "lastActionAt": 1791801374643,
+      "createdAt": 1791801374643
+    },
+    {
+      "id": "765e0341-65fe-4bbf-85e3-96e0877d0091",
+      "url": "https://18comic.vip/photo/1150430",
+      "source": "JM",
+      "sourceLabel": "禁漫天堂",
+      "lastAction": "open",
+      "lastActionAt": 1791801356261,
+      "createdAt": 1791801356261
+    },
+    {
+      "id": "e8ebbe83-a0de-4520-a8d8-3500a1df2e7f",
+      "url": "https://18comic.vip/photo/1465595",
+      "source": "JM",
+      "sourceLabel": "禁漫天堂",
+      "lastAction": "open",
+      "lastActionAt": 1791801141428,
+      "createdAt": 1791801141428
+    },
+    {
+      "id": "623a96ea-2fbd-48a8-9546-1f5095260d2e",
+      "url": "https://nhentai.net/g/674785",
+      "source": "N",
+      "sourceLabel": "N 站",
+      "lastAction": "open",
+      "lastActionAt": 1791800893640,
+      "createdAt": 1791800893640
+    },
+    {
+      "id": "c54534c3-6921-4521-98e2-fad88025eef8",
+      "url": "https://nhentai.net/g/674810",
+      "source": "N",
+      "sourceLabel": "N 站",
+      "lastAction": "open",
+      "lastActionAt": 1791800499517,
+      "createdAt": 1791800499517
     }
   ],
-  "favorites": []
+  "favorites": [
+    {
+      "id": "4457c82e-175b-4052-be19-75b70ba17a58",
+      "url": "https://nhentai.net/g/674810",
+      "source": "N",
+      "title": "N 站 · https://nhentai.net/g/674810",
+      "createdAt": 1791800877258,
+      "updatedAt": 1791800877258
+    }
+  ]
 }
