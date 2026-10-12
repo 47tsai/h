@@ -12,6 +12,8 @@
 :root[data-theme="light"] { color-scheme: light; background: #f4f6fb; color: #172033; }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-width: 320px; min-height: 100%; }
+html { background: #0b0e14; }
+html[data-theme="light"] { background: #f4f6fb; }
 body { min-height: 100vh; }
 button, input { font: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
