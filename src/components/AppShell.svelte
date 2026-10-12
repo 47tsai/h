@@ -58,11 +58,11 @@
     const textSites = ['M', 'J'];
     const numericSites = ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? [];
     const detectedSites = converterSite === 'AUTO'
-      ? validId ? [...numericSites, 'M', 'J'] : ['M', 'J']
+      ? validId ? numericSites : textSites
       : [converterSite];
     converterResults = id
       ? detectedSites
-          .filter((key) => textSites.includes(key) || validId)
+          .filter((key) => validId ? !textSites.includes(key) : textSites.includes(key))
           .map((key) => {
             const source = converterSources[key];
             if (!source) return null;
