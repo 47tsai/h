@@ -51,21 +51,28 @@ function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
+function hasOnlyKeys(value, allowed) {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 function validItem(entity, value) {
   if (!isPlainObject(value) || typeof value.id !== 'string' || !value.id || value.id.length > 200) return false;
   if (entity === 'stopwatchRecords') {
-    return typeof value.title === 'string' && value.title.length <= 500
+    return hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
+      && typeof value.title === 'string' && value.title.length <= 500
       && safeInteger(value.startedAt) && safeInteger(value.endedAt)
       && safeInteger(value.durationMs) && safeInteger(value.createdAt);
   }
   if (entity === 'resultHistory') {
-    return isSafeHttpUrl(value.url) && typeof value.source === 'string' && value.source.length <= 200
+    return hasOnlyKeys(value, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
+      && isSafeHttpUrl(value.url) && typeof value.source === 'string' && value.source.length <= 200
       && typeof value.sourceLabel === 'string' && value.sourceLabel.length <= 500
       && ['open', 'copy', 'share'].includes(value.lastAction)
       && safeInteger(value.lastActionAt) && safeInteger(value.createdAt);
   }
   if (entity === 'favorites') {
-    return isSafeHttpUrl(value.url) && typeof value.title === 'string' && value.title.length <= 500
+    return hasOnlyKeys(value, ['id', 'source', 'url', 'title', 'notes', 'createdAt', 'updatedAt'])
+      && isSafeHttpUrl(value.url) && typeof value.title === 'string' && value.title.length <= 500
       && (value.source === undefined || (typeof value.source === 'string' && value.source.length <= 200))
       && (value.notes === undefined || (typeof value.notes === 'string' && value.notes.length <= 5000))
       && safeInteger(value.createdAt) && safeInteger(value.updatedAt);
@@ -84,7 +91,9 @@ function isSafeHttpUrl(value) {
 }
 
 function validateDocument(doc) {
-  if (!isPlainObject(doc) || doc.schemaVersion !== 1 || typeof doc.updatedAt !== 'string'
+  if (!isPlainObject(doc)
+    || !hasOnlyKeys(doc, ['schemaVersion', 'updatedAt', 'settings', 'stopwatchRecords', 'resultHistory', 'favorites', 'tombstones'])
+    || doc.schemaVersion !== 1 || typeof doc.updatedAt !== 'string'
     || !Number.isFinite(Date.parse(doc.updatedAt))) return false;
   for (const entity of ALLOWED_ENTITIES) {
     if (!Array.isArray(doc[entity]) || doc[entity].length > MAX_ITEMS
@@ -103,6 +112,7 @@ function validateDocument(doc) {
     || !hasUnique(doc.favorites, 'id') || !hasUnique(doc.favorites, 'url')) return false;
   if (!Array.isArray(doc.tombstones) || doc.tombstones.length > MAX_ITEMS * 3) return false;
   if (!doc.tombstones.every((item) => isPlainObject(item)
+    && hasOnlyKeys(item, ['key', 'entity', 'id', 'deletedAt'])
     && ALLOWED_ENTITIES.includes(item.entity)
     && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
     && item.key === item.entity + ':' + item.id
@@ -113,7 +123,7 @@ function validateDocument(doc) {
     || doc.resultHistory.some((item) => tombstoneKeys.has('resultHistory:' + item.id))
     || doc.favorites.some((item) => tombstoneKeys.has('favorites:' + item.id))) return false;
   const settings = doc.settings;
-  if (!isPlainObject(settings) || Object.keys(settings).some((key) => key !== 'theme')
+  if (!isPlainObject(settings) || !hasOnlyKeys(settings, ['theme'])
     || (settings.theme !== undefined && !['system', 'light', 'dark'].includes(settings.theme))) return false;
   return true;
 }
