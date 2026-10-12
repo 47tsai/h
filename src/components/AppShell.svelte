@@ -337,23 +337,17 @@
   let dataBusy = false;
   let syncBusy = false;
   let syncError = '';
-  let syncPassword = '';
   let lastSyncedAt = '';
   const syncWorkerUrl = (import.meta.env.PUBLIC_SYNC_WORKER_URL ?? '').trim();
   const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
 
   async function runCloudSync() {
     if (!syncWorkerUrl || syncBusy) return;
-    if (!syncPassword.trim()) {
-      syncError = '請先輸入同步密碼。';
-      return;
-    }
-    const password = syncPassword;
     syncBusy = true;
     syncError = '';
     notice = '';
     try {
-      const result = await syncWithCloud(syncWorkerUrl, theme, password);
+      const result = await syncWithCloud(syncWorkerUrl, theme);
       lastSyncedAt = result.syncedAt;
       try { localStorage.setItem('h-tools-last-synced-at', result.syncedAt); } catch { /* Status remains available for this session. */ }
       const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
@@ -369,7 +363,6 @@
       syncError = error instanceof Error ? error.message : '同步失敗，請稍後再試。';
     } finally {
       syncBusy = false;
-      syncPassword = '';
     }
   }
 
@@ -625,10 +618,9 @@
           {#if syncWorkerUrl}
             <p class="sync-privacy-warning" role="note">隱私提醒：目前同步檔案位於公開 GitHub 儲存庫，任何人都可能讀取。請勿同步密碼、私人資訊或不希望公開的收藏與歷史紀錄。</p>
             <div class="sync-controls">
-              <input type="password" bind:value={syncPassword} autocomplete="off" placeholder="輸入同步密碼" aria-label="雲端同步密碼" disabled={syncBusy} />
-              <button class="secondary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
+              <button class="primary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy}>{syncBusy ? '同步中…' : '立即同步'}</button>
             </div>
-            <p class="sync-last-success">同步密碼只用於本次 HTTPS 請求，不會儲存至本機。</p>
+            <p class="sync-last-success">按下「立即同步」即可合併本機與雲端資料。</p>
           {:else}
             <div class="setting-row"><div><strong>尚未設定同步服務</strong></div><button class="secondary-button" disabled>立即同步</button></div>
           {/if}
