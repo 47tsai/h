@@ -19,6 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: node --check worker/src/index.js && node --check worker/scripts/hash-sync-password.mjs
       - run: npm run check
       - run: npm test
       - run: npm run build
