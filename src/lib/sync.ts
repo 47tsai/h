@@ -196,13 +196,10 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
   for (const item of document.favorites) await saveFavorite(item);
 }
 
-export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
-  if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
-
-  const document = await createLocalDocument(theme);
+async function requestSync(endpoint: string, document: SyncDocument) {
   let response: Response;
   try {
-    response = await fetch(endpoint.replace(/\/+$/, '') + '/api/sync', {
+    response = await fetch(endpoint.replace(/\\/+$/, '') + '/api/sync', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
@@ -225,7 +222,44 @@ export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' 
       : '';
     throw new Error(ERROR_MESSAGES[code] ?? '同步失敗，請稍後再試。');
   }
+  return result;
+}
 
+function hasSameLocalData(left: SyncDocument, right: SyncDocument): boolean {
+  return JSON.stringify({
+    settings: left.settings,
+    stopwatchRecords: left.stopwatchRecords,
+    resultHistory: left.resultHistory,
+    favorites: left.favorites,
+    tombstones: left.tombstones,
+  }) === JSON.stringify({
+    settings: right.settings,
+    stopwatchRecords: right.stopwatchRecords,
+    resultHistory: right.resultHistory,
+    favorites: right.favorites,
+    tombstones: right.tombstones,
+  });
+}
+
+export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
+  if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
+
+  let document = await createLocalDocument(theme);
+  let result: { ok: true; document: SyncDocument; syncedAt: string } | undefined;
+  const maxAttempts = 3;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    result = await requestSync(endpoint, document);
+    const latestLocalDocument = await createLocalDocument(theme);
+    if (hasSameLocalData(document, latestLocalDocument)) break;
+
+    if (attempt === maxAttempts - 1) {
+      throw new Error('同步期間本機資料持續變更，為避免覆蓋新資料，請稍後重新同步。');
+    }
+    document = latestLocalDocument;
+  }
+
+  if (!result) throw new Error('同步失敗，請稍後再試。');
   await applyRemoteDocument(result.document);
   return { syncedAt: result.syncedAt, document: result.document };
 }
