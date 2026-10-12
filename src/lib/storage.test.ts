@@ -111,10 +111,11 @@ describe('IndexedDB favorites', () => {
   });
   it('keeps deletion tombstones increasing if the system clock moves backwards', async () => {
     await saveFavorite(sampleFavorite());
-    const now = vi.spyOn(Date, 'now');
-    now.mockReturnValueOnce(1_000).mockReturnValueOnce(500);
+    let currentTime = 1_000;
+    const now = vi.spyOn(Date, 'now').mockImplementation(() => currentTime);
     try {
       await deleteFavorite('favorite-1');
+      currentTime = 500;
       await deleteFavorite('favorite-1');
     } finally {
       now.mockRestore();
