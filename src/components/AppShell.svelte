@@ -44,7 +44,9 @@
 
   function updateConverterOutput() {
     const id = converterInput.trim();
-    const source = converterSources[converterSite];
+    const detectedSite = ({ 5: 'W', 6: 'N', 7: 'JM', 8: 'P' } as Record<number, string>)[id.length];
+    const sourceKey = converterSite === 'AUTO' ? detectedSite : converterSite;
+    const source = sourceKey ? converterSources[sourceKey] : undefined;
     converterOutput = id && /^[0-9]+$/.test(id) && source
       ? `${source.label}（${source.domain}） · 編號 ${id}`
       : '';
@@ -377,6 +379,7 @@
           <div class="converter-source-card">
             <label class="converter-source-label" for="converter-site">來源網站</label>
             <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => updateConverterOutput()}>
+              <option value="AUTO">自動識別</option>
               <option value="N">N站</option>
               <option value="W">W站</option>
               <option value="JM">JM站</option>
@@ -389,7 +392,7 @@
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
             </div>
-            <p class="converter-hint">選擇來源並輸入編號，結果會即時更新。網站網域僅作顯示，尚未建立來源專用的轉換規則。</p>
+            <p class="converter-hint">可手動選擇來源，或依編號位數自動識別：5 位 W、6 位 N、7 位 JM、8 位 P。自動識別不限制輸入長度；位數不符合時不會判定來源。</p>
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
