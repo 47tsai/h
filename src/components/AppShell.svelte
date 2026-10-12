@@ -257,7 +257,7 @@
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(favoriteUrl.trim());
-      if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') throw new Error('Only HTTP(S) URLs are supported.');
+      if ((parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) throw new Error('Only safe HTTP(S) URLs are supported.');
     } catch {
       storageError = '請輸入有效的 http 或 https 網址。';
       return;
