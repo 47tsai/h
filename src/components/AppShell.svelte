@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
-  import { deleteFavorite, deleteStopwatchRecord, listFavorites, listStopwatchRecords, saveFavorite, saveStopwatchRecord, type FavoriteItem, type StopwatchRecord } from '../lib/storage';
+  import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
   import { convertInput } from '../lib/converter';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
@@ -10,7 +10,7 @@
     { id: 'converter', label: '編號轉換', icon: '↗', hint: 'Converter' },
     { id: 'history', label: '歷史紀錄', icon: '◷', hint: 'History' },
     { id: 'favorites', label: '我的收藏', icon: '☆', hint: 'Favorites' },
-    { id: 'stopwatch', label: '純碼錶', icon: '◴', hint: 'Stopwatch' },
+    { id: 'stopwatch', label: '碼錶', icon: '◴', hint: 'Stopwatch' },
     { id: 'settings', label: '設定', icon: '⚙', hint: 'Settings' },
   ];
 
@@ -20,6 +20,7 @@
   let tick: ReturnType<typeof setInterval> | undefined;
   let runningState: RunningState | null = null;
   let records: StopwatchRecord[] = [];
+  let resultHistory: ResultHistoryItem[] = [];
   let favorites: FavoriteItem[] = [];
   let favoriteTitle = '';
   let favoriteUrl = '';
@@ -31,6 +32,8 @@
   let notice = '';
   let recordQuery = '';
   let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
+  let resultQuery = '';
+  let resultSort: 'newest' | 'oldest' = 'newest';
   let converterInput = '';
   let converterSite = 'AUTO';
   let converterOutput = '';
@@ -102,7 +105,8 @@
     if (!converterOutput) return;
     try {
       await navigator.clipboard.writeText(converterOutput);
-      notice = converterUrls.some((result) => result.startsWith('https://')) ? '已複製轉換結果。' : '已複製預覽結果。';
+      for (const result of converterResults) await logResultAction(result, 'copy');
+      notice = '已複製並記錄轉換結果。';
     } catch {
       notice = '無法存取剪貼簿，請手動複製結果。';
     }
@@ -112,9 +116,8 @@
     if (!converterOutput) return;
     const shareText = converterOutput;
     try {
-      if (navigator.share) await navigator.share({ text: shareText });
-      else await navigator.clipboard.writeText(shareText);
-      notice = '已送出分享要求或複製結果。';
+      if (navigator.share) { await navigator.share({ text: shareText }); for (const result of converterResults) await logResultAction(result, 'share'); notice = '已分享並記錄轉換結果。'; }
+      else { await navigator.clipboard.writeText(shareText); for (const result of converterResults) await logResultAction(result, 'copy'); notice = '瀏覽器不支援分享，已複製並記錄轉換結果。'; }
     } catch {
       notice = '分享已取消或目前瀏覽器不支援。';
     }
@@ -131,13 +134,54 @@
   $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
   $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
-  $: filteredFavorites = favorites
-    .filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())))
-    .sort((a, b) => favoriteSort === 'oldest' ? a.createdAt - b.createdAt
-      : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW')
-      : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt
-      : b.createdAt - a.createdAt);
+  $: filteredResultHistory = resultHistory.filter((item) => [item.url, item.sourceLabel].some((value) => value.toLocaleLowerCase().includes(resultQuery.toLocaleLowerCase()))).sort((a,b) => resultSort === 'oldest' ? a.lastActionAt-b.lastActionAt : b.lastActionAt-a.lastActionAt);
+  $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? '', favoriteSourceLabel(item)].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase()))).sort((a, b) => favoriteSort === 'oldest' ? a.createdAt - b.createdAt : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW') : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt : b.createdAt - a.createdAt);
+  $: favoriteGroups = [...new Set(filteredFavorites.map((item) => favoriteSourceLabel(item)))].map((label) => ({ label, items: filteredFavorites.filter((item) => favoriteSourceLabel(item) === label) }));
   $: elapsedLabel = formatDuration(elapsedMs);
+
+  function sourceForUrl(url: string): { key: string; label: string } {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      const found = Object.entries(converterSources).find(([, source]) => host === source.domain || host.endsWith('.' + source.domain) || host.includes(source.domain.replace(/^www\./, '')));
+      return found ? { key: found[0], label: found[1].label } : { key: host, label: host };
+    } catch { return { key: 'other', label: '其他網站' }; }
+  }
+  function favoriteSourceLabel(item: FavoriteItem): string {
+    return item.source && converterSources[item.source] ? converterSources[item.source].label : sourceForUrl(item.url).label;
+  }
+  async function logResultAction(result: {key:string;label:string;url:string}, action: 'open'|'copy'|'share') {
+    const timestamp = Date.now();
+    await recordResultAction({ id: crypto.randomUUID(), url: result.url, source: result.key, sourceLabel: result.label, lastAction: action, lastActionAt: timestamp, createdAt: timestamp });
+    resultHistory = await listResultHistory();
+  }
+  async function openResult(result: {key:string;label:string;url:string}) {
+    window.open(result.url, '_blank', 'noopener,noreferrer');
+    try { await logResultAction(result, 'open'); notice = '已記錄開啟的' + result.label + '網址。'; }
+    catch (error) { storageError = error instanceof Error ? error.message : '無法保存歷史紀錄。'; }
+  }
+  async function copyResult(result: {key:string;label:string;url:string}) {
+    try { await navigator.clipboard.writeText(result.url); await logResultAction(result, 'copy'); notice = '已複製並記錄' + result.label + '網址。'; }
+    catch (error) { notice = error instanceof Error ? error.message : '無法複製或保存紀錄。'; }
+  }
+  async function shareResult(result: {key:string;label:string;url:string}) {
+    try {
+      if (navigator.share) { await navigator.share({ text: result.url }); await logResultAction(result, 'share'); notice = '已分享並記錄' + result.label + '網址。'; }
+      else { await navigator.clipboard.writeText(result.url); await logResultAction(result, 'copy'); notice = '瀏覽器不支援分享，已複製並記錄' + result.label + '網址。'; }
+    } catch { notice = '分享已取消或目前瀏覽器不支援。'; }
+  }
+  async function toggleHistoryFavorite(item: ResultHistoryItem) {
+    const existing = favorites.find((favorite) => favorite.url === item.url);
+    try {
+      if (existing) { await deleteFavorite(existing.id); notice = '已從收藏移除。'; }
+      else { const timestamp = Date.now(); await saveFavorite({ id: crypto.randomUUID(), url: item.url, source: item.source, title: item.sourceLabel + ' · ' + item.url, createdAt: timestamp, updatedAt: timestamp }); notice = '已加入收藏。'; }
+      favorites = await listFavorites();
+    } catch (error) { storageError = error instanceof Error ? error.message : '更新收藏失敗。'; }
+  }
+  async function removeHistoryItem(id: string) {
+    try { await deleteResultHistory(id); resultHistory = await listResultHistory(); notice = '已刪除這筆歷史紀錄。'; }
+    catch (error) { storageError = error instanceof Error ? error.message : '刪除歷史紀錄失敗。'; }
+  }
+  function actionLabel(action: ResultHistoryItem['lastAction']): string { return action === 'open' ? '開啟' : action === 'copy' ? '複製' : '分享'; }
 
   function makeTitle(timestamp: number): string {
     const date = new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
@@ -228,6 +272,7 @@
     const item: FavoriteItem = {
       id: existing?.id ?? crypto.randomUUID(),
       url: normalizedUrl,
+      source: existing?.source ?? sourceForUrl(normalizedUrl).key,
       title: favoriteTitle.trim() || parsedUrl.hostname,
       notes: favoriteNotes.trim() || undefined,
       createdAt: existing?.createdAt ?? timestamp,
@@ -314,6 +359,8 @@
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取紀錄失敗。'; });
     listFavorites().then((value) => { favorites = value; })
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取收藏失敗。'; });
+    listResultHistory().then((value) => { resultHistory = value; })
+      .catch((error) => { storageError = error instanceof Error ? error.message : '讀取歷史紀錄失敗。'; });
     return () => {
       if (tick) clearInterval(tick);
       media.removeEventListener('change', onThemeChange);
@@ -351,7 +398,7 @@
 
     <div class="content">
       {#if activeSection === 'stopwatch'}
-        <section class="page-heading"><h1>純碼錶</h1></section>
+        <section class="page-heading"><h1>碼錶</h1></section>
         <section class="stopwatch-card">
           <div class="card-topline"><span class="live-indicator"></span><span>{runningState?.running ? '計時中' : runningState ? '已暫停' : '準備就緒'}</span></div>
           <div class="timer-display" aria-live="off">{elapsedLabel}<span class="timer-hundredths">.{String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0')}</span></div>
@@ -367,18 +414,11 @@
           </div>
           
         </section>
-        <section class="records-section">
-          <div class="section-heading"><h2>最近紀錄</h2><span class="count-pill">{records.length} 筆</span></div>
-          <div class="record-list">
-            {#if records.length === 0}
-              <div class="empty-state"><div class="empty-icon">◷</div><strong>尚無紀錄</strong></div>
-            {:else}
-              {#each records.slice(0, 5) as record (record.id)}
-                <article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>{new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>
-              {/each}
-              {#if records.length > 5}<button class="text-button" onclick={() => activeSection = 'history'}>查看全部 {records.length} 筆紀錄 →</button>{/if}
-            {/if}
-          </div>
+        <section class="history-stats" aria-label="碼錶統計"><article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong></article><article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong></article><article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong></article></section>
+        <section class="records-section full-records"><div class="section-heading"><h2>計時紀錄</h2><span class="count-pill">{records.length} 筆</span></div>
+          <div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋計時紀錄…" aria-label="搜尋計時紀錄" /></label><label class="sort-field">排序<select bind:value={recordSort} aria-label="計時紀錄排序"><option value="newest">最新優先</option><option value="oldest">最舊優先</option><option value="longest">時間最長</option><option value="shortest">時間最短</option></select></label></div>
+          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">◷</div><strong>{records.length ? '沒有符合的紀錄' : '尚無計時紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '停止並儲存碼錶後，紀錄會顯示在這裡'}</span></div>
+          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'settings'}
         <section class="page-heading"><h1>設定</h1></section>
@@ -388,26 +428,10 @@
           <div class="setting-row"><div><strong>雲端同步</strong></div><span class="setting-badge muted">尚未啟用</span></div>
         </section>
       {:else if activeSection === 'history'}
-        <section class="page-heading"><h1>歷史紀錄</h1></section>
-        <section class="history-stats" aria-label="碼錶統計">
-          <article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong></article>
-          <article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong></article>
-          <article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong></article>
-        </section>
-        <section class="records-section full-records">
-          <div class="history-toolbar">
-            <label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋紀錄名稱…" aria-label="搜尋碼錶紀錄" /></label>
-            <label class="sort-field">排序
-              <select bind:value={recordSort} aria-label="歷史紀錄排序">
-                <option value="newest">最新優先</option>
-                <option value="oldest">最舊優先</option>
-                <option value="longest">時間最長</option>
-                <option value="shortest">時間最短</option>
-              </select>
-            </label>
-          </div>
-          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">⌕</div><strong>{records.length ? '沒有符合的紀錄' : '目前沒有紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '開始計時後會顯示在這裡'}</span></div>
-          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
+        <section class="page-heading"><div><h1>歷史紀錄</h1><p>開啟、複製或分享過的結果會自動整理在這裡。</p></div><span class="count-pill">{resultHistory.length} 筆</span></section>
+        <section class="records-section full-records"><div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={resultQuery} placeholder="搜尋網址或來源站…" aria-label="搜尋結果歷史紀錄" /></label><label class="sort-field">排序<select bind:value={resultSort} aria-label="歷史紀錄排序"><option value="newest">最近操作</option><option value="oldest">最早操作</option></select></label></div>
+          {#if filteredResultHistory.length === 0}<div class="record-list empty-state"><div class="empty-icon">◷</div><strong>{resultHistory.length ? '沒有符合的紀錄' : '目前沒有歷史紀錄'}</strong><span>{resultHistory.length ? '試試其他關鍵字' : '開啟、複製或分享轉換結果後，就會自動記錄在這裡'}</span></div>
+          {:else}<div class="favorite-list">{#each filteredResultHistory as item (item.id)}<article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.sourceLabel}</strong><a href={item.url} target="_blank" rel="noopener noreferrer" onclick={() => void logResultAction({key:item.source,label:item.sourceLabel,url:item.url}, 'open')}>{item.url}</a><small>最後操作：{actionLabel(item.lastAction)} · {new Date(item.lastActionAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} title={favorites.some((favorite) => favorite.url === item.url) ? '取消收藏' : '加入收藏'} onclick={() => toggleHistoryFavorite(item)}>{favorites.some((favorite) => favorite.url === item.url) ? '★' : '☆'}</button><button class="open-favorite" aria-label="複製網址" title="複製網址" onclick={() => void copyResult({key:item.source,label:item.sourceLabel,url:item.url})}>⧉</button><button class="delete-button" aria-label="刪除歷史紀錄" title="刪除紀錄" onclick={() => removeHistoryItem(item.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
         <section class="page-heading"><h1>編號轉換</h1></section>
@@ -442,9 +466,9 @@
                     <div class="converter-multi-heading">{result.label}</div>
                     <div class="converter-multi-url">{result.url}</div>
                     <div class="converter-multi-actions">
-                      <button class="secondary-button" onclick={() => window.open(result.url, '_blank', 'noopener,noreferrer')}>↗ 開啟</button>
-                      <button class="secondary-button" onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg> 複製</button>
-                      <button class="secondary-button" onclick={async () => { try { if (navigator.share) await navigator.share({ text: result.url }); else { await navigator.clipboard.writeText(result.url); notice = '瀏覽器不支援分享，已複製' + result.label + '網址。'; return; } notice = '已分享' + result.label + '網址。'; } catch { notice = '分享已取消或目前瀏覽器不支援。'; } }}>↗ 分享</button>
+                      <button class="secondary-button" onclick={() => void openResult(result)}>↗ 開啟</button>
+                      <button class="secondary-button" onclick={() => void copyResult(result)}><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg> 複製</button>
+                      <button class="secondary-button" onclick={() => void shareResult(result)}>↗ 分享</button>
                     </div>
                   </div>
                 {/each}
@@ -458,13 +482,13 @@
                 </div>
               </div>
               <div class="converter-result-actions">
-                <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
+                <button class="secondary-button" disabled={!converterUrl} onclick={() => { const result = converterResults[0]; if (result) void openResult(result); }}>↗ 開啟</button>
               </div>
             {/if}
           </div>
         </section>
       {:else}
-        <section class="page-heading"><h1>我的收藏</h1><span class="count-pill">{favorites.length} 筆</span></section>
+        <section class="page-heading"><div><h1>我的收藏</h1><p>依來源站分類整理，星號可從歷史紀錄快速加入或移除。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
           <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2></div></div>
           <form class="favorite-form" onsubmit={(event) => { event.preventDefault(); void addFavorite(); }}>
@@ -479,9 +503,7 @@
           {#if filteredFavorites.length === 0}
             <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字' : '新增網址即可收藏'}</span></div>
           {:else}
-            <div class="favorite-list">{#each filteredFavorites as item (item.id)}
-              <article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}>✎</button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>
-            {/each}</div>
+            {#each favoriteGroups as group (group.label)}<section class="favorite-group"><div class="section-heading"><h2>{group.label}</h2><span class="count-pill">{group.items.length} 筆</span></div><div class="favorite-list">{#each group.items as item (item.id)}<article class="favorite-row"><div class="record-symbol">★</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}>✎</button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>{/each}</div></section>{/each}
           {/if}
         </section>
       {/if}
@@ -527,7 +549,7 @@
   .record-symbol { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border:1px solid var(--line); border-radius:10px; color:var(--accent); background:var(--panel-2); font-size:17px; }.record-info { min-width:0; flex:1; }.record-info strong { display:block; font-size:11px; font-weight:600; overflow-wrap:anywhere; }.record-info small { display:block; margin-top:5px; font-size:9px; color:var(--muted); }
   .record-duration { font-size:12px; font-variant-numeric:tabular-nums; letter-spacing:.03em; }.delete-button { width:27px; height:27px; border:1px solid transparent; background:transparent; color:var(--muted); border-radius:7px; font-size:19px; cursor:pointer; }.delete-button:hover { color:#ff8f9b; border-color:#ff8f9b35; }
   .empty-state { min-height:164px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:25px 15px; }.empty-icon { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px; color:var(--accent); background:var(--panel-2); font-size:20px; margin-bottom:3px; }.empty-state strong { font-size:11px; font-weight:600; }.empty-state span { font-size:10px; color:var(--muted); line-height:1.6; }
-  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
+  .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-group { margin-bottom:22px; }.favorite-group .section-heading { margin:18px 0 10px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; }
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
   .setting-badge { border:1px solid #62d8a32a; color:#62d8a3; background:#62d8a30b; border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
