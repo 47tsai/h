@@ -220,4 +220,44 @@ describe('sync Worker merge behavior', () => {
     expect(saved[0].favorites).toEqual(result.document.favorites);
   });
 
+
+  it('keeps the canonical remote ID while applying newer local data for the same URL', async () => {
+    const local = validDocument();
+    local.favorites[0] = {
+      ...local.favorites[0],
+      id: 'local-favorite-newer',
+      url: 'https://example.com/shared-favorite',
+      title: 'New local title',
+      notes: 'Updated on this device',
+      updatedAt: 900,
+      createdAt: 400,
+    };
+
+    const remote = validDocument();
+    remote.favorites[0] = {
+      ...remote.favorites[0],
+      id: 'remote-favorite-canonical',
+      url: 'https://example.com/shared-favorite',
+      title: 'Older remote title',
+      notes: 'Older remote note',
+      updatedAt: 500,
+      createdAt: 300,
+    };
+
+    const saved = mockGitHub(remote);
+    const response = await send(local, githubEnv);
+    expect(response.status).toBe(200);
+    const result = await response.json();
+
+    expect(result.document.favorites).toHaveLength(1);
+    expect(result.document.favorites[0]).toMatchObject({
+      id: 'remote-favorite-canonical',
+      title: 'New local title',
+      notes: 'Updated on this device',
+      updatedAt: 900,
+      createdAt: 300,
+    });
+    expect(saved[0].favorites).toEqual(result.document.favorites);
+  });
+
 });
