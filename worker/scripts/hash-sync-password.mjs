@@ -10,7 +10,7 @@ function hashPassword(password) {
   return 'pbkdf2-sha256$' + iterations + '$' + salt.toString('base64') + '$' + hash.toString('base64');
 }
 
-if (process.env.SYNC_PASSWORD) {
+if (Object.hasOwn(process.env, 'SYNC_PASSWORD')) {
   try {
     const encoded = hashPassword(process.env.SYNC_PASSWORD);
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, 'hash=' + encoded + '\n');
