@@ -434,7 +434,7 @@
         const item = value as Record<string, unknown>;
         return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
           && typeof item.title === 'string' && item.title.length <= 500
-          && ['startedAt', 'endedAt', 'durationMs', 'createdAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+          && ['startedAt', 'endedAt', 'durationMs', 'createdAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
       });
       const validHistory = importedHistory.every((value) => {
         if (!value || typeof value !== 'object') return false;
@@ -443,15 +443,16 @@
           && isSafeHttpUrl(item.url) && typeof item.source === 'string' && item.source.length <= 200
           && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
           && ['open', 'copy', 'share'].includes(String(item.lastAction))
-          && ['lastActionAt', 'createdAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+          && ['lastActionAt', 'createdAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
       });
       const validFavorites = importedFavorites.every((value) => {
         if (!value || typeof value !== 'object') return false;
         const item = value as Record<string, unknown>;
         return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
           && isSafeHttpUrl(item.url) && typeof item.title === 'string' && item.title.length <= 500
+          && (item.source === undefined || (typeof item.source === 'string' && item.source.length <= 200))
           && (item.notes === undefined || (typeof item.notes === 'string' && item.notes.length <= 5000))
-          && ['createdAt', 'updatedAt'].every((key) => typeof item[key] === 'number' && Number.isFinite(item[key]));
+          && ['createdAt', 'updatedAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
       });
       if (!validRecords || !validHistory || !validFavorites) throw new Error('備份包含無效資料，未匯入任何內容。');
       if (!window.confirm(`即將合併備份資料：${importedRecords.length} 筆碼錶、${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
