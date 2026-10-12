@@ -38,26 +38,31 @@
   let converterUrls: string[] = [];
   let converterResults: { key: string; label: string; url: string }[] = [];
 
-  const converterSources: Record<string, { label: string; domain: string; buildUrl?: (id: string) => string }> = {
+  const converterSources: Record<string, { label: string; domain: string; buildUrl: (id: string) => string }> = {
     N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
     W: { label: 'W 站', domain: 'w.com', buildUrl: (id) => `https://www.w.com/photos-slide-aid-${id}.html` },
     JM: { label: 'JM 站', domain: 'jm.com', buildUrl: (id) => `https://jm.com/photo/${id}` },
     P: { label: 'P 站', domain: 'p.com', buildUrl: (id) => `https://www.p.com/artworks/${id}` },
+    M: { label: 'M 站', domain: 'm.com', buildUrl: (id) => `https://m.com/${encodeURIComponent(id.toLowerCase())}` },
+    J: { label: 'J 站', domain: 'j.com', buildUrl: (id) => `https://j.com/videos/${encodeURIComponent(id.toLowerCase())}` },
   };
 
   function updateConverterOutput() {
     const id = converterInput.trim();
     const validId = Boolean(id && /^[0-9]+$/.test(id));
+    const textSites = ['M', 'J'];
     const detectedSites = converterSite === 'AUTO'
-      ? ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? []
+      ? validId
+        ? [...((({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? []), 'M', 'J']
+        : ['M', 'J']
       : [converterSite];
-    converterResults = validId
+    converterResults = id
       ? detectedSites
+          .filter((key) => textSites.includes(key) || validId)
           .map((key) => {
             const source = converterSources[key];
             if (!source) return null;
-            const url = source.buildUrl ? source.buildUrl(id) : `${source.label}（${source.domain}） · 編號 ${id}`;
-            return { key, label: source.label, url };
+            return { key, label: source.label, url: source.buildUrl(id) };
           })
           .filter((result): result is { key: string; label: string; url: string } => Boolean(result))
       : [];
@@ -81,7 +86,7 @@
         notice = '剪貼簿目前沒有文字。';
         return;
       }
-      converterInput = text.trim();
+      converterInput = text.trim().toLowerCase();
       updateConverterOutput();
       notice = '已貼上剪貼簿內容。';
     } catch {
@@ -418,11 +423,11 @@
               <option value="P">P站</option>
             </select>
             <div class="converter-input-wrap">
-              <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => updateConverterOutput()} inputmode="numeric" pattern="[0-9]*" placeholder="輸入編號" aria-label="作品編號" />
+              <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }} placeholder="輸入編號或文字" aria-label="作品編號或文字" />
               <div class="converter-input-actions">
                 <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /><path d="M16 4h2a2 2 0 0 1 2 2v4" /><path d="M21 14h-7" /><path d="m17 10-4 4 4 4" /></svg></button>
                 <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}>×</button>
-                <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
+                {#if converterSite !== 'M' && converterSite !== 'J'}<button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>{/if}
               </div>
             </div>
             
