@@ -171,4 +171,53 @@ describe('sync Worker merge behavior', () => {
     expect(result.document.favorites[0].title).toBe('Remote title');
     expect(saved[0].favorites[0].title).toBe('Remote title');
   });
+
+  it('canonicalizes same-URL favorites and history items from different devices', async () => {
+    const local = validDocument();
+    local.resultHistory[0] = {
+      ...local.resultHistory[0],
+      id: 'local-history',
+      url: 'https://example.com/shared-history',
+      lastActionAt: 500,
+      createdAt: 400,
+    };
+    local.favorites[0] = {
+      ...local.favorites[0],
+      id: 'local-favorite',
+      url: 'https://example.com/shared-favorite',
+      updatedAt: 500,
+      createdAt: 400,
+    };
+
+    const remote = validDocument();
+    remote.resultHistory[0] = {
+      ...remote.resultHistory[0],
+      id: 'remote-history',
+      url: 'https://example.com/shared-history',
+      lastActionAt: 500,
+      createdAt: 300,
+    };
+    remote.favorites[0] = {
+      ...remote.favorites[0],
+      id: 'remote-favorite',
+      url: 'https://example.com/shared-favorite',
+      updatedAt: 500,
+      createdAt: 300,
+    };
+
+    const saved = mockGitHub(remote);
+    const response = await send(local, githubEnv);
+    expect(response.status).toBe(200);
+    const result = await response.json();
+
+    expect(result.document.resultHistory).toHaveLength(1);
+    expect(result.document.resultHistory[0].id).toBe('remote-history');
+    expect(result.document.resultHistory[0].createdAt).toBe(300);
+    expect(result.document.favorites).toHaveLength(1);
+    expect(result.document.favorites[0].id).toBe('remote-favorite');
+    expect(result.document.favorites[0].createdAt).toBe(300);
+    expect(saved[0].resultHistory).toEqual(result.document.resultHistory);
+    expect(saved[0].favorites).toEqual(result.document.favorites);
+  });
+
 });
