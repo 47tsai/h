@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
   import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
-  import { convertInput } from '../lib/converter';
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
 
