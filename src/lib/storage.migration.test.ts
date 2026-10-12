@@ -1,10 +1,12 @@
 import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { deleteDB, openDB } from 'idb';
+import * as storage from './storage';
 
 const databaseName = 'h-tools';
 
 afterEach(async () => {
+  await storage.closeStorageDatabase();
   await deleteDB(databaseName);
 });
 
@@ -28,8 +30,7 @@ describe('IndexedDB schema migration', () => {
     await legacyDb.put('stopwatch-records', legacyRecord);
     legacyDb.close();
 
-    // Import after creating the v1 database so the production module upgrades this exact database.
-    const storage = await import('./storage');
+    // The storage module is already imported, but it opens the database lazily on first use.
     expect(await storage.listStopwatchRecords()).toEqual([legacyRecord]);
     expect(await storage.listFavorites()).toEqual([]);
 
