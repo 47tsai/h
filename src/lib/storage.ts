@@ -54,6 +54,10 @@ interface HToolsDB extends DBSchema {
     value: ResultHistoryItem;
     indexes: { 'by-lastActionAt': number; 'by-url': string };
   };
+  'sync-tombstones': {
+    key: string;
+    value: SyncTombstone;
+  };
 }
 
 let databasePromise: Promise<IDBPDatabase<HToolsDB>> | undefined;
