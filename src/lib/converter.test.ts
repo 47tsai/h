@@ -54,6 +54,11 @@ describe('converter core', () => {
       ok: false,
       code: 'invalid-id',
     });
+    const credentialed = { ...exampleSource, buildUrl: () => 'https://user:pass@example.com/item/123' };
+    expect(convertInput('https://example.com/item/123', [credentialed])).toMatchObject({
+      ok: false,
+      code: 'invalid-generated-url',
+    });
     const unsafe = { ...exampleSource, buildUrl: () => 'javascript:alert(1)' };
     expect(convertInput('https://example.com/item/123', [unsafe])).toMatchObject({
       ok: false,
