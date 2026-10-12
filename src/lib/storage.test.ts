@@ -4,8 +4,11 @@ import { openDB } from 'idb';
 import {
   deleteFavorite,
   deleteStopwatchRecord,
+  importBackupData,
   listFavorites,
   listStopwatchRecords,
+  listResultHistory,
+  listSyncTombstones,
   saveFavorite,
   saveStopwatchRecord,
   type FavoriteItem,
@@ -107,3 +110,38 @@ describe('IndexedDB favorites', () => {
     expect(await listStopwatchRecords()).toHaveLength(1);
   });
 });
+
+describe('atomic backup import', () => {
+  it('imports records and favorites and clears tombstones for restored entries', async () => {
+    const record = sampleRecord();
+    const favorite = sampleFavorite();
+    await saveFavorite(favorite);
+    await deleteFavorite(favorite.id);
+    expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(true);
+
+    await importBackupData([record], [], [favorite]);
+
+    expect((await listStopwatchRecords()).map((item) => item.id)).toEqual([record.id]);
+    expect((await listFavorites()).map((item) => item.id)).toEqual([favorite.id]);
+    expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(false);
+  });
+
+  it('merges history by URL without violating the unique URL index', async () => {
+    const { recordResultAction } = await import('./storage');
+    const existing = {
+      id: 'existing-history', url: 'https://example.com/item/123', source: 'example',
+      sourceLabel: 'Example', lastAction: 'open' as const, lastActionAt: 20, createdAt: 10,
+    };
+    await recordResultAction(existing);
+    await importBackupData([], [{
+      ...existing, id: 'imported-history', lastAction: 'copy', lastActionAt: 30, createdAt: 5,
+    }], []);
+
+    const history = await listResultHistory();
+    expect(history).toHaveLength(1);
+    expect(history[0].id).toBe('existing-history');
+    expect(history[0].lastAction).toBe('copy');
+    expect(history[0].createdAt).toBe(10);
+  });
+});
+
