@@ -420,7 +420,7 @@
             <div class="converter-input-wrap">
               <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => updateConverterOutput()} inputmode="numeric" pattern="[0-9]*" placeholder="輸入編號" aria-label="作品編號" />
               <div class="converter-input-actions">
-                <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}>▤</button>
+                <button class="converter-icon-button" aria-label="貼上編號" title="貼上" onclick={pasteConverterInput}><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /><path d="M16 4h2a2 2 0 0 1 2 2v4" /><path d="M21 14h-7" /><path d="m17 10-4 4 4 4" /></svg></button>
                 <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}>×</button>
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
@@ -437,7 +437,7 @@
                     <div class="converter-multi-url">{result.url}</div>
                     <div class="converter-multi-actions">
                       <button class="secondary-button" onclick={() => window.open(result.url, '_blank', 'noopener,noreferrer')}>↗ 開啟</button>
-                      <button class="secondary-button" onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}>▢ 複製</button>
+                      <button class="secondary-button" onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}><svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg> 複製</button>
                       <button class="secondary-button" onclick={async () => { try { if (navigator.share) await navigator.share({ text: result.url }); else { await navigator.clipboard.writeText(result.url); notice = '瀏覽器不支援分享，已複製' + result.label + '網址。'; return; } notice = '已分享' + result.label + '網址。'; } catch { notice = '分享已取消或目前瀏覽器不支援。'; } }}>↗ 分享</button>
                     </div>
                   </div>
@@ -447,7 +447,7 @@
               <div class="converter-output-row">
                 <div class="converter-output-text" aria-live="polite">{converterOutput || '轉換結果'}</div>
                 <div class="converter-output-actions">
-                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}>▢</button>
+                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}><svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="13" height="13" rx="2" /><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" /></svg></button>
                   <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
                 </div>
               </div>
