@@ -96,10 +96,8 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
   for (const item of document.favorites) await saveFavorite(item);
 }
 
-export async function syncWithCloud(endpoint: string, password: string, theme: 'system' | 'light' | 'dark') {
-  password = password.trim();
+export async function syncWithCloud(endpoint: string, theme: 'system' | 'light' | 'dark') {
   if (!isSafeWorkerUrl(endpoint)) throw new Error('同步服務網址未設定或不是有效的 HTTPS 網址。');
-  if (password.length < 1) throw new Error('請輸入同步密碼。');
 
   const document = await createLocalDocument(theme);
   let response: Response;
@@ -108,7 +106,7 @@ export async function syncWithCloud(endpoint: string, password: string, theme: '
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       cache: 'no-store',
-      body: JSON.stringify({ action: 'sync', password, document }),
+      body: JSON.stringify({ action: 'sync', document }),
     });
   } catch {
     throw new Error('無法連線同步服務，請檢查網路或稍後再試。');
