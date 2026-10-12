@@ -22,6 +22,7 @@
 - [Worker 安全與部署規格](docs/WORKER_SECURITY_AND_DEPLOYMENT.md)
 - [實作路線圖](docs/IMPLEMENTATION_ROADMAP.md)
 - [技術決策紀錄](docs/TECHNICAL_DECISIONS.md)
+- [Phase 0 技術決策比較表](docs/PHASE_0_DECISION_MATRIX.md)
 - [規格一致性盤點](docs/SPEC_CONSISTENCY_AUDIT.md)
 
 ## 技術方向
