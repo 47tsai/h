@@ -141,4 +141,33 @@ describe('applying cloud sync results', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body)).document.favorites).toEqual([newFavorite]);
   });
 
+
+  it('stops after bounded retries without applying a stale cloud snapshot', async () => {
+    let calls = 0;
+    const addedFavorites = [1, 2, 3].map((n) => ({
+      id: 'added-during-sync-' + n,
+      url: 'https://example.com/added-during-sync-' + n,
+      title: 'Added during sync ' + n,
+      createdAt: 300 + n,
+      updatedAt: 300 + n,
+    }));
+    const fetchMock = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const payload = JSON.parse(String(init?.body));
+      await saveFavorite(addedFavorites[calls]);
+      calls += 1;
+      return new Response(JSON.stringify({
+        ok: true,
+        syncedAt: '2026-10-12T12:01:00.000Z',
+        document: payload.document,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(syncWithCloud('https://sync.example.com', 'dark'))
+      .rejects.toThrow('同步期間本機資料持續變更');
+
+    expect(calls).toBe(3);
+    expect(await listFavorites()).toEqual(addedFavorites);
+  });
+
 });
