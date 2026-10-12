@@ -71,7 +71,7 @@
       : [];
     converterUrls = converterResults.map((result) => result.url);
     converterUrl = converterResults[0]?.url ?? '';
-    converterOutput = converterUrls.join('\\n');
+    converterOutput = converterUrls.join('\n');
   }
   function clearConverter() {
     converterInput = '';
@@ -143,7 +143,7 @@
   function sourceForUrl(url: string): { key: string; label: string } {
     try {
       const host = new URL(url).hostname.toLowerCase();
-      const found = Object.entries(converterSources).find(([, source]) => host === source.domain || host.endsWith('.' + source.domain) || host.includes(source.domain.replace(/^www\./, '')));
+      const found = Object.entries(converterSources).find(([, source]) => host === source.domain || host.endsWith('.' + source.domain));
       return found ? { key: found[0], label: found[1].label } : { key: host, label: host };
     } catch { return { key: 'other', label: '其他網站' }; }
   }
@@ -522,10 +522,6 @@
     }
   }
 
-  function checkConverterInput() {
-    const result = convertInput(converterInput, []);
-    notice = result.ok ? result.url : result.message;
-  }
 
   onMount(() => {
     try {
@@ -569,7 +565,7 @@
     
     <nav aria-label="主要導覽">
       {#each navigation as item}
-        <button class:active={activeSection === item.id} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
+        <button class:active={activeSection === item.id} aria-current={activeSection === item.id ? 'page' : undefined} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
           <span class="nav-icon" aria-hidden="true"><Icon name={item.icon} size={20} /></span><span>{item.label}</span>
           {#if activeSection === item.id}<span class="nav-dot"></span>{/if}
         </button>
@@ -669,6 +665,7 @@
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
             {#if converterResults.length > 1}
+              <div class="converter-bulk-actions"><span>{converterResults.length} 個結果</span><button class="secondary-button" onclick={copyConverterOutput}><Icon name="copy" size={15} /> 複製全部網址</button></div>
               <div class="converter-multi-results">
                 {#each converterResults as result (result.key)}
                   <div class="converter-multi-result">
@@ -790,6 +787,7 @@
     .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
     .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.settings-data-stats { gap:6px; }.settings-data-stats > div { padding:9px 7px; }.settings-data-stats strong { font-size:17px; }.settings-section-heading { align-items:flex-start; flex-wrap:wrap; }.settings-section-heading > .setting-badge { margin-left:48px; }.setting-action,.setting-row .secondary-button,.danger-button { max-width:100%; }.sync-explainer { gap:9px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
+  :global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible) { outline:2px solid var(--accent-strong); outline-offset:3px; }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 
   .converter-layout { display:grid; gap:16px; max-width:840px; margin:0 auto; }
@@ -805,6 +803,7 @@
   .converter-icon-button:disabled { opacity:.35; cursor:not-allowed; }
   .converter-hint { margin:10px 2px 0; color:var(--muted); font-size:10px; }
   .converter-output-row { display:flex; align-items:center; gap:12px; min-height:84px; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--bg); }
+  .converter-bulk-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; color:var(--muted); font-size:11px; }
   .converter-multi-results { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   .converter-multi-result { min-width:0; display:flex; flex-direction:column; gap:10px; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--bg); }
   .converter-multi-heading { font-size:12px; font-weight:700; color:var(--accent); }
