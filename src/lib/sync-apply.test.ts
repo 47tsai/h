@@ -1,10 +1,11 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
-import { listFavorites, listSyncTombstones, saveFavorite } from './storage';
+import { listFavorites, listStopwatchRecords, listSyncTombstones, saveFavorite } from './storage';
 import { syncWithCloud } from './sync';
 
 async function clearDatabase() {
+  await listStopwatchRecords();
   const db = await openDB('h-tools', 4);
   await Promise.all([
     db.clear('stopwatch-records'),
