@@ -1,9 +1,14 @@
 import 'fake-indexeddb/auto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { deleteDB, openDB } from 'idb';
 import * as storage from './storage';
 
 const databaseName = 'h-tools';
+
+beforeEach(async () => {
+  await storage.closeStorageDatabase();
+  await deleteDB(databaseName);
+});
 
 afterEach(async () => {
   await storage.closeStorageDatabase();
@@ -11,7 +16,7 @@ afterEach(async () => {
 });
 
 describe('IndexedDB schema migration', () => {
-  it('upgrades a v1 database to v2 without losing stopwatch records', async () => {
+  it('upgrades a v1 database to v3 without losing stopwatch records', async () => {
     const legacyRecord = {
       id: 'legacy-record',
       startedAt: 1_000,
@@ -30,13 +35,14 @@ describe('IndexedDB schema migration', () => {
     await legacyDb.put('stopwatch-records', legacyRecord);
     legacyDb.close();
 
-    // The storage module is already imported, but it opens the database lazily on first use.
+    // The storage module opens lazily and upgrades the existing v1 database to the current schema.
     expect(await storage.listStopwatchRecords()).toEqual([legacyRecord]);
     expect(await storage.listFavorites()).toEqual([]);
 
-    const upgradedDb = await openDB(databaseName, 2);
-    expect(Array.from(upgradedDb.objectStoreNames)).toEqual(['favorites', 'stopwatch-records']);
+    const upgradedDb = await openDB(databaseName, 3);
+    expect(Array.from(upgradedDb.objectStoreNames)).toEqual(['favorites', 'result-history', 'stopwatch-records']);
     expect(Array.from(upgradedDb.transaction('favorites').store.indexNames)).toEqual(['by-createdAt', 'by-title']);
+    expect(Array.from(upgradedDb.transaction('result-history').store.indexNames)).toEqual(['by-lastActionAt', 'by-url']);
     expect(await upgradedDb.get('stopwatch-records', 'legacy-record')).toEqual(legacyRecord);
     upgradedDb.close();
   });
