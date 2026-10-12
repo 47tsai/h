@@ -343,11 +343,17 @@
 
   async function runCloudSync() {
     if (!syncWorkerUrl || syncBusy) return;
+    const password = window.prompt('請輸入專用的雲端同步密碼。密碼不會儲存在此裝置。');
+    if (password === null) return;
+    if (!password.trim()) {
+      syncError = '請輸入同步密碼。';
+      return;
+    }
     syncBusy = true;
     syncError = '';
     notice = '';
     try {
-      const result = await syncWithCloud(syncWorkerUrl, theme);
+      const result = await syncWithCloud(syncWorkerUrl, theme, password);
       lastSyncedAt = result.syncedAt;
       try { localStorage.setItem('h-tools-last-synced-at', result.syncedAt); } catch { /* Status remains available for this session. */ }
       const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
