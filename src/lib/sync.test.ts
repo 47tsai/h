@@ -52,6 +52,26 @@ describe('cloud sync document validation', () => {
     badUrl.resultHistory[0].url = 'javascript:alert(1)';
     expect(isValidSyncDocument(badUrl)).toBe(false);
   });
+  it('rejects live records that conflict with a deletion tombstone', () => {
+    const recordConflict = validDocument();
+    recordConflict.tombstones.push({
+      key: 'stopwatchRecords:record-1', entity: 'stopwatchRecords', id: 'record-1', deletedAt: 300,
+    });
+    expect(isValidSyncDocument(recordConflict)).toBe(false);
+
+    const historyConflict = validDocument();
+    historyConflict.tombstones.push({
+      key: 'resultHistory:history-1', entity: 'resultHistory', id: 'history-1', deletedAt: 300,
+    });
+    expect(isValidSyncDocument(historyConflict)).toBe(false);
+
+    const favoriteConflict = validDocument();
+    favoriteConflict.tombstones.push({
+      key: 'favorites:favorite-1', entity: 'favorites', id: 'favorite-1', deletedAt: 300,
+    });
+    expect(isValidSyncDocument(favoriteConflict)).toBe(false);
+  });
+
   it('rejects duplicate IDs and URLs that could overwrite unrelated local data', () => {
     const duplicateRecord = validDocument();
     duplicateRecord.stopwatchRecords.push({ ...duplicateRecord.stopwatchRecords[0] });
