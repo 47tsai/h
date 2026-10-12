@@ -14,7 +14,7 @@
     { id: 'settings', label: '設定', icon: '⚙', hint: 'Settings' },
   ];
 
-  let activeSection: Section = 'stopwatch';
+  let activeSection: Section = 'converter';
   let theme: Theme = 'system';
   let now = Date.now();
   let tick: ReturnType<typeof setInterval> | undefined;
@@ -32,7 +32,7 @@
   let recordQuery = '';
   let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let converterInput = '';
-  let converterSite = 'N';
+  let converterSite = 'AUTO';
   let converterOutput = '';
   let converterUrl = '';
   let converterUrls: string[] = [];
