@@ -27,6 +27,20 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(validDocument())).toBe(true);
   });
 
+  it('rejects unknown fields in sync documents and records', () => {
+    const extraTopLevel = validDocument();
+    Object.assign(extraTopLevel, { unexpected: true });
+    expect(isValidSyncDocument(extraTopLevel)).toBe(false);
+
+    const extraRecordField = validDocument();
+    Object.assign(extraRecordField.stopwatchRecords[0], { unexpected: true });
+    expect(isValidSyncDocument(extraRecordField)).toBe(false);
+
+    const extraTombstoneField = validDocument();
+    Object.assign(extraTombstoneField.tombstones[0], { unexpected: true });
+    expect(isValidSyncDocument(extraTombstoneField)).toBe(false);
+  });
+
   it('rejects unsafe URLs containing credentials', () => {
     const document = validDocument();
     document.favorites[0].url = 'https://user:password@example.com/item/2';
