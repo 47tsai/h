@@ -220,6 +220,7 @@ export async function importBackupData(
     await tx.done;
   } catch (error) {
     try { tx.abort(); } catch { /* The transaction may already have completed or aborted. */ }
+    await tx.done.catch(() => undefined);
     throw error;
   }
 }
