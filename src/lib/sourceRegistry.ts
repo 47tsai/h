@@ -13,6 +13,7 @@ const youtube: SourceAdapter = {
   },
   extractId(input) {
     if (!input.includes('://')) return input;
+    if (!youtube.matchesInput(input)) return null;
     const url = new URL(input);
     if (url.hostname.endsWith('youtu.be')) return url.pathname.split('/').filter(Boolean)[0] ?? null;
     if (url.pathname === '/watch') return url.searchParams.get('v');
@@ -33,15 +34,16 @@ const bilibili: SourceAdapter = {
   matchesInput(input) {
     try {
       const url = new URL(input);
-      return ['bilibili.com', 'www.bilibili.com', 'm.bilibili.com', 'b23.tv'].includes(url.hostname);
+      return ['bilibili.com', 'www.bilibili.com', 'm.bilibili.com'].includes(url.hostname);
     } catch {
       return false;
     }
   },
   extractId(input) {
     if (!input.includes('://')) return input;
+    if (!bilibili.matchesInput(input)) return null;
     const url = new URL(input);
-    const match = url.pathname.match(/^\/video\/(BV[A-Za-z0-9]+)\/?$/i);
+    const match = url.pathname.match(/^\/video\/(BV[A-Za-z0-9]+)\/?$/);
     if (match) return match[1];
     return null;
   },
