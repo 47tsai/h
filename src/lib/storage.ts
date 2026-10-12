@@ -119,8 +119,15 @@ export async function listResultHistory(): Promise<ResultHistoryItem[]> {
 }
 export async function recordResultAction(item: ResultHistoryItem): Promise<void> {
   const db = await getDatabase();
-  const existing = await db.getFromIndex('result-history', 'by-url', item.url);
-  await db.put('result-history', { ...item, id: existing?.id ?? item.id, createdAt: existing?.createdAt ?? item.createdAt });
+  const tx = db.transaction('result-history', 'readwrite');
+  const store = tx.objectStore('result-history');
+  const existing = await store.index('by-url').get(item.url);
+  await store.put({
+    ...item,
+    id: existing?.id ?? item.id,
+    createdAt: existing?.createdAt ?? item.createdAt,
+  });
+  await tx.done;
 }
 export async function deleteResultHistory(id: string): Promise<void> {
   const db = await getDatabase();
@@ -153,8 +160,13 @@ export async function listSyncTombstones(): Promise<SyncTombstone[]> {
 
 export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void> {
   const db = await getDatabase();
-  const current = await db.get('sync-tombstones', tombstone.key);
-  if (!current || tombstone.deletedAt > current.deletedAt) await db.put('sync-tombstones', tombstone);
+  const tx = db.transaction('sync-tombstones', 'readwrite');
+  const store = tx.objectStore('sync-tombstones');
+  const current = await store.get(tombstone.key);
+  if (!current || tombstone.deletedAt > current.deletedAt) {
+    await store.put(tombstone);
+  }
+  await tx.done;
 }
 
 export async function importBackupData(
