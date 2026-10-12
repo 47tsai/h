@@ -90,12 +90,24 @@ function validateDocument(doc) {
     if (!Array.isArray(doc[entity]) || doc[entity].length > MAX_ITEMS
       || !doc[entity].every((item) => validItem(entity, item))) return false;
   }
+  const hasUnique = (items, field) => {
+    const values = new Set();
+    for (const item of items) {
+      if (values.has(item[field])) return false;
+      values.add(item[field]);
+    }
+    return true;
+  };
+  if (!hasUnique(doc.stopwatchRecords, 'id')
+    || !hasUnique(doc.resultHistory, 'id') || !hasUnique(doc.resultHistory, 'url')
+    || !hasUnique(doc.favorites, 'id') || !hasUnique(doc.favorites, 'url')) return false;
   if (!Array.isArray(doc.tombstones) || doc.tombstones.length > MAX_ITEMS * 3) return false;
   if (!doc.tombstones.every((item) => isPlainObject(item)
     && ALLOWED_ENTITIES.includes(item.entity)
     && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
     && item.key === item.entity + ':' + item.id
-    && safeInteger(item.deletedAt))) return false;
+    && safeInteger(item.deletedAt))
+    || !hasUnique(doc.tombstones, 'key')) return false;
   const settings = doc.settings ?? {};
   if (!isPlainObject(settings) || Object.keys(settings).some((key) => key !== 'theme')
     || (settings.theme !== undefined && !['system', 'light', 'dark'].includes(settings.theme))) return false;
