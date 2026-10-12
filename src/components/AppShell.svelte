@@ -34,9 +34,10 @@
   let converterInput = '';
   let converterSite = 'N';
   let converterOutput = '';
+  let converterUrl = '';
 
-  const converterSources: Record<string, { label: string; domain: string }> = {
-    N: { label: 'N 站', domain: 'n.com' },
+  const converterSources: Record<string, { label: string; domain: string; buildUrl?: (id: string) => string }> = {
+    N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
     W: { label: 'W 站', domain: 'w.com' },
     JM: { label: 'JM 站', domain: 'jm.com' },
     P: { label: 'P 站', domain: 'p.com' },
@@ -47,8 +48,10 @@
     const detectedSite = ({ 5: 'W', 6: 'N', 7: 'JM', 8: 'P' } as Record<number, string>)[id.length];
     const sourceKey = converterSite === 'AUTO' ? detectedSite : converterSite;
     const source = sourceKey ? converterSources[sourceKey] : undefined;
-    converterOutput = id && /^[0-9]+$/.test(id) && source
-      ? `${source.label}（${source.domain}） · 編號 ${id}`
+    const validId = Boolean(id && /^[0-9]+$/.test(id) && source);
+    converterUrl = validId && source?.buildUrl ? source.buildUrl(id) : '';
+    converterOutput = validId && source
+      ? converterUrl || `${source.label}（${source.domain}） · 編號 ${id}`
       : '';
   }
 
@@ -81,8 +84,8 @@
   async function copyConverterOutput() {
     if (!converterOutput) return;
     try {
-      await navigator.clipboard.writeText(converterOutput);
-      notice = '已複製預覽結果。';
+      await navigator.clipboard.writeText(converterUrl || converterOutput);
+      notice = converterUrl ? '已複製網址。' : '已複製預覽結果。';
     } catch {
       notice = '無法存取剪貼簿，請手動複製結果。';
     }
@@ -90,9 +93,10 @@
 
   async function shareConverterOutput() {
     if (!converterOutput) return;
+    const shareText = converterUrl || converterOutput;
     try {
-      if (navigator.share) await navigator.share({ text: converterOutput });
-      else await navigator.clipboard.writeText(converterOutput);
+      if (navigator.share) await navigator.share({ text: shareText });
+      else await navigator.clipboard.writeText(shareText);
       notice = '已送出分享要求或複製結果。';
     } catch {
       notice = '分享已取消或目前瀏覽器不支援。';
@@ -420,9 +424,9 @@
               </div>
             </div>
             <div class="converter-result-actions">
-              <button class="secondary-button" disabled={!converterOutput} onclick={() => { notice = '目前只顯示來源與編號，尚未設定可開啟的頁面網址。'; }}>↗ 開啟</button>
+              <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
             </div>
-            <div class="converter-preview-note"><span>ⓘ</span> 已移除預覽按鈕。結果目前僅顯示來源與編號，尚未連接作品頁面網址。</div>
+            <div class="converter-preview-note"><span>ⓘ</span> N 站已支援依編號產生作品網址；其他來源的網址規則尚待設定。</div>
           </div>
           <div class="converter-footer-actions">
             <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
