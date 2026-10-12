@@ -169,23 +169,37 @@
     }
   }
 
+  function startStopwatchTick() {
+    if (tick) return;
+    tick = setInterval(() => { now = Date.now(); }, 100);
+  }
+
+  function stopStopwatchTick() {
+    if (tick) clearInterval(tick);
+    tick = undefined;
+    now = Date.now();
+  }
+
   function startStopwatch() {
     const startedAt = Date.now();
     runningState = { sessionStartedAt: startedAt, startedAt, accumulatedMs: 0, running: true };
     persistRunningState();
+    startStopwatchTick();
     notice = '';
   }
 
   function pauseStopwatch() {
     if (!runningState || !runningState.running) return;
-    runningState = { ...runningState, accumulatedMs: elapsedMs, running: false };
+    runningState = { ...runningState, accumulatedMs: getElapsedMs(runningState, Date.now()), running: false };
     persistRunningState();
+    stopStopwatchTick();
   }
 
   function resumeStopwatch() {
     if (!runningState || runningState.running) return;
     runningState = { ...runningState, startedAt: Date.now(), running: true };
     persistRunningState();
+    startStopwatchTick();
   }
 
   async function stopStopwatch() {
@@ -205,6 +219,7 @@
       records = await listStopwatchRecords();
       runningState = null;
       persistRunningState();
+      stopStopwatchTick();
       notice = '碼錶紀錄已儲存在這台裝置。';
       storageError = '';
     } catch (error) {
@@ -471,6 +486,7 @@
       for (const item of savedFavorites) await deleteFavorite(item.id);
       try { localStorage.removeItem('h-tools-stopwatch-active'); } catch { /* Other data was still deleted. */ }
       runningState = null;
+      stopStopwatchTick();
       records = [];
       resultHistory = [];
       favorites = [];
@@ -504,7 +520,7 @@
     const media = window.matchMedia('(prefers-color-scheme: light)');
     const onThemeChange = () => { if (theme === 'system') updateTheme(); };
     media.addEventListener('change', onThemeChange);
-    tick = setInterval(() => { now = Date.now(); }, 100);
+    if (runningState?.running) startStopwatchTick();
     listStopwatchRecords().then((value) => { records = value; })
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取紀錄失敗。'; });
     listFavorites().then((value) => { favorites = value; })
