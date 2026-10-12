@@ -63,7 +63,7 @@
     converterUrl = validId
       ? detectedSites.map((key) => converterSources[key]?.buildUrl?.(id)).find(Boolean) ?? ''
       : '';
-    converterOutput = results.join('\\n');
+    converterOutput = results.join('\n');
   }
 
   function clearConverter() {
