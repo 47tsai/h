@@ -4,7 +4,7 @@
   import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, importBackupData, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
-  import { converterSources, sourceForUrl } from '../lib/converter-sources';
+  import { buildConversionResults, converterSources, sourceForUrl } from '../lib/converter-sources';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -45,25 +45,9 @@
 
 
   function updateConverterOutput() {
-    const id = converterInput.trim();
-    const validId = Boolean(id && /^[0-9]+$/.test(id));
-    const textSites = ['M', 'J'];
-    const numericSites = ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? [];
-    const detectedSites = converterSite === 'AUTO'
-      ? validId ? numericSites : textSites
-      : [converterSite];
-    converterResults = id
-      ? detectedSites
-          .filter((key) => validId ? !textSites.includes(key) : textSites.includes(key))
-          .map((key) => {
-            const source = converterSources[key];
-            if (!source) return null;
-            return { key, label: source.label, url: source.buildUrl(id) };
-          })
-          .filter((result): result is { key: string; label: string; url: string } => Boolean(result))
-      : [];
+    converterResults = buildConversionResults(converterInput, converterSite);
     converterUrls = converterResults.map((result) => result.url);
-    converterUrl = converterResults[0]?.url ?? '';
+    converterUrl = converterUrls[0] ?? '';
     converterOutput = converterUrls.join('\n');
   }
   function clearConverter() {
