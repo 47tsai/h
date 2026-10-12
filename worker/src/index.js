@@ -281,7 +281,12 @@ export default {
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    // Password verification is disabled for now to restore one-tap sync.
+    if (typeof env.SYNC_PASSWORD_HASH !== 'string' || !env.SYNC_PASSWORD_HASH) {
+      return fail('SERVER_NOT_CONFIGURED', 500, allowedOrigin);
+    }
+    if (!(await verifyPassword(payload.password, env.SYNC_PASSWORD_HASH))) {
+      return fail('AUTH_FAILED', 401, allowedOrigin);
+    }
     if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
     if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
