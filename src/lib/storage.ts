@@ -168,8 +168,11 @@ export async function importBackupData(
   const hasValidId = (item: unknown): item is { id: string } => Boolean(item && typeof item === 'object'
     && typeof (item as { id?: unknown }).id === 'string' && (item as { id: string }).id.length > 0
     && (item as { id: string }).id.length <= 200);
-  const hasValidUrl = (item: unknown): item is { id: string; url: string } => hasValidId(item)
-    && typeof (item as { url?: unknown }).url === 'string' && (item as { url: string }).url.length <= 4096;
+  const hasValidUrl = (item: unknown): item is { id: string; url: string } => {
+    if (!hasValidId(item)) return false;
+    const url = (item as { url?: unknown }).url;
+    return typeof url === 'string' && url.length <= 4096;
+  };
   const hasUniqueIds = (items: { id: string }[]) => new Set(items.map((item) => item.id)).size === items.length;
   const hasUniqueUrls = (items: { url: string }[]) => new Set(items.map((item) => item.url)).size === items.length;
   if (!importedRecords.every(hasValidId) || !importedHistory.every(hasValidUrl) || !importedFavorites.every(hasValidUrl)
