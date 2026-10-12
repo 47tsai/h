@@ -5,7 +5,7 @@
 1. 使用者在設定頁手動按下同步，不會背景自動同步。
 2. 前端從 IndexedDB 讀取碼表紀錄、歷史紀錄、收藏、刪除標記與主題設定。
 3. 前端將資料送至設定好的 Cloudflare Worker `/api/sync`。
-4. Worker 檢查 Origin、請求方法、JSON 格式、大小、資料結構與請求頻率。
+4. Worker 檢查 Origin、請求方法、JSON 格式、大小、允許欄位、資料結構與請求頻率；遇到未知欄位、重複 ID／URL 或資料與同 ID 刪除標記衝突時會拒絕同步。
 5. Worker 從固定設定的 GitHub 儲存庫讀取 `data/sync.json`，合併資料後使用檔案 SHA 寫回。
 6. 遇到 GitHub 版本衝突時，最多重試三次。
 7. Worker 回傳合併結果，前端套用到 IndexedDB 並顯示結果。
