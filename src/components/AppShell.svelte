@@ -32,6 +32,45 @@
   let recordQuery = '';
   let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let converterInput = '';
+  let converterSite = 'N';
+  let converterOutput = '';
+
+  function updateConverterOutput() {
+    const id = converterInput.trim();
+    converterOutput = id && /^[0-9]+$/.test(id) ? `https://example.invalid/${converterSite}/${id}` : '';
+  }
+
+  function clearConverter() {
+    converterInput = '';
+    converterOutput = '';
+    notice = '';
+  }
+
+  function randomConverter() {
+    converterInput = String(Math.floor(Math.random() * 900000) + 100000);
+    updateConverterOutput();
+  }
+
+  async function copyConverterOutput() {
+    if (!converterOutput) return;
+    try {
+      await navigator.clipboard.writeText(converterOutput);
+      notice = '已複製預覽結果。';
+    } catch {
+      notice = '無法存取剪貼簿，請手動複製結果。';
+    }
+  }
+
+  async function shareConverterOutput() {
+    if (!converterOutput) return;
+    try {
+      if (navigator.share) await navigator.share({ text: converterOutput });
+      else await navigator.clipboard.writeText(converterOutput);
+      notice = '已送出分享要求或複製結果。';
+    } catch {
+      notice = '分享已取消或目前瀏覽器不支援。';
+    }
+  }
 
   $: elapsedMs = getElapsedMs(runningState, now);
   $: filteredRecords = records
@@ -323,9 +362,46 @@
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
-        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>來源清單確認後，再逐項加入可靠的轉換規則。</p></div></section>
-        <section class="placeholder-card"><div class="placeholder-icon">↗</div><h2>轉換器的骨架已就位</h2><p>目前還沒加入任何來源規則，因此不會猜測網址或產生可能錯誤的連結。</p><label for="converter-id">測試輸入欄位</label><input id="converter-id" class="converter-input" bind:value={converterInput} placeholder="輸入編號或網址" /><button class="primary-button" onclick={checkConverterInput}>檢查輸入</button><small>來源註冊表與驗證規則會獨立實作，避免轉換邏輯散落在介面中。</small></section>
-      {:else}
+        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>輸入編號，選擇來源，查看轉換結果。</p></div><div class="heading-chip"><span class="pulse"></span>預覽介面</div></section>
+        <section class="converter-layout">
+          <div class="converter-source-card">
+            <label class="converter-source-label" for="converter-site">來源網站</label>
+            <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => updateConverterOutput()}>
+              <option value="N">N站</option>
+              <option value="W">W站</option>
+              <option value="JM">JM站</option>
+              <option value="P">P站</option>
+            </select>
+            <div class="converter-input-wrap">
+              <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => updateConverterOutput()} inputmode="numeric" pattern="[0-9]*" placeholder="輸入編號" aria-label="作品編號" />
+              <div class="converter-input-actions">
+                <button class="converter-icon-button" aria-label="清除" title="清除" onclick={clearConverter}>×</button>
+                <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
+              </div>
+            </div>
+            <p class="converter-hint">選擇來源並輸入編號，結果會即時更新。</p>
+          </div>
+          <div class="converter-output-card">
+            <div class="converter-output-label">轉換結果</div>
+            <div class="converter-output-row">
+              <div class="converter-output-text" aria-live="polite">{converterOutput || '輸入編號後會在此顯示結果'}</div>
+              <div class="converter-output-actions">
+                <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}>▢</button>
+                <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
+              </div>
+            </div>
+            <div class="converter-result-actions">
+              <button class="primary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>▧ 預覽</button>
+              <button class="secondary-button" disabled={!converterOutput} onclick={() => { notice = '目前是介面預覽，尚未連接實際來源網址。'; }}>↗ 開啟</button>
+            </div>
+            <div class="converter-preview-note"><span>ⓘ</span> 目前僅重製操作介面；來源網址與預覽功能尚未連接。</div>
+          </div>
+          <div class="converter-footer-actions">
+            <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
+            <button class="text-button" onclick={() => activeSection = 'settings'}>主題設定 →</button>
+          </div>
+        </section>
+      
         <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
           <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
@@ -415,4 +491,27 @@
     .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
+
+  .converter-layout { display:grid; gap:16px; max-width:840px; margin:0 auto; }
+  .converter-source-card,.converter-output-card { border:1px solid var(--line); border-radius:18px; padding:20px; background:var(--panel); box-shadow:0 12px 35px #0000000a; }
+  .converter-source-label,.converter-output-label { display:block; margin-bottom:10px; color:var(--muted); font-size:11px; font-weight:600; }
+  .converter-site-select { width:100%; border:0; border-radius:11px; padding:13px 14px; background:var(--panel-2); color:var(--text); font-size:13px; outline:1px solid var(--line); }
+  .converter-input-wrap { display:flex; align-items:center; gap:8px; margin-top:14px; border:1px solid var(--line); border-radius:12px; padding:5px 8px 5px 16px; background:var(--bg); }
+  .converter-id-input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--text); text-align:center; font-size:clamp(35px,7vw,54px); letter-spacing:.03em; padding:10px 0; font-variant-numeric:tabular-nums; }
+  .converter-id-input::placeholder { color:var(--muted); opacity:.7; font-size:clamp(22px,4vw,32px); letter-spacing:0; }
+  .converter-input-actions,.converter-output-actions { display:flex; flex-direction:column; gap:5px; }
+  .converter-icon-button { width:34px; height:34px; flex:0 0 34px; display:grid; place-items:center; border:1px solid var(--line); border-radius:9px; background:var(--panel-2); color:var(--muted); cursor:pointer; font-size:17px; }
+  .converter-icon-button:hover:not(:disabled) { color:var(--text); border-color:var(--accent); }
+  .converter-icon-button:disabled { opacity:.35; cursor:not-allowed; }
+  .converter-hint { margin:10px 2px 0; color:var(--muted); font-size:10px; }
+  .converter-output-row { display:flex; align-items:center; gap:12px; min-height:84px; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--bg); }
+  .converter-output-text { min-width:0; flex:1; text-align:center; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
+  .converter-result-actions { display:flex; gap:12px; margin-top:14px; }
+  .converter-result-actions button { flex:1; }
+  .converter-result-actions button:disabled { opacity:.4; cursor:not-allowed; transform:none; }
+  .converter-preview-note { display:flex; gap:8px; align-items:flex-start; margin-top:16px; padding-top:13px; border-top:1px solid var(--line); color:var(--muted); font-size:10px; line-height:1.7; }
+  .converter-preview-note span { color:var(--accent); }
+  .converter-footer-actions { display:flex; align-items:center; justify-content:space-between; color:var(--muted); font-size:9px; letter-spacing:.12em; padding:0 4px; }
+  .converter-footer-actions .text-button { width:auto; padding:8px; font-size:10px; letter-spacing:0; }
+  .footer-separator { color:var(--line); padding:0 4px; }
 </style>
