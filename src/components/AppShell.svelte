@@ -436,15 +436,12 @@
                     <div class="converter-multi-heading">{result.label}</div>
                     <div class="converter-multi-url">{result.url}</div>
                     <div class="converter-multi-actions">
-                      <button class="secondary-button" onclick={() => window.open(result.url, '_blank', 'noopener,noreferrer')}>↗ 開啟{result.label}</button>
-                      <button class="converter-icon-button" aria-label={'複製' + result.label + '網址'} title={'複製' + result.label + '網址'} onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}>▢</button>
+                      <button class="secondary-button" onclick={() => window.open(result.url, '_blank', 'noopener,noreferrer')}>↗ 開啟</button>
+                      <button class="secondary-button" onclick={async () => { try { await navigator.clipboard.writeText(result.url); notice = '已複製' + result.label + '網址。'; } catch { notice = '無法存取剪貼簿，請手動複製網址。'; } }}>▢ 複製</button>
+                      <button class="secondary-button" onclick={async () => { try { if (navigator.share) await navigator.share({ text: result.url }); else { await navigator.clipboard.writeText(result.url); notice = '瀏覽器不支援分享，已複製' + result.label + '網址。'; return; } notice = '已分享' + result.label + '網址。'; } catch { notice = '分享已取消或目前瀏覽器不支援。'; } }}>↗ 分享</button>
                     </div>
                   </div>
                 {/each}
-              </div>
-              <div class="converter-result-actions">
-                <button class="secondary-button" onclick={copyConverterOutput}>▢ 複製全部</button>
-                <button class="secondary-button" onclick={shareConverterOutput}>↗ 分享全部</button>
               </div>
             {:else}
               <div class="converter-output-row">
