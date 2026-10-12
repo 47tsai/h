@@ -25,3 +25,29 @@ export function sourceForUrl(url: string): { key: string; label: string } {
     return { key: 'other', label: '其他網站' };
   }
 }
+
+export interface ConverterResult {
+  key: string;
+  label: string;
+  url: string;
+}
+
+/** Build the same multi-result output used by the converter UI. */
+export function buildConversionResults(input: string, selectedSource: string): ConverterResult[] {
+  const id = input.trim();
+  if (!id) return [];
+
+  const isNumericId = /^[0-9]+$/.test(id);
+  const textSources = ['M', 'J'];
+  const numericSources = ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? [];
+  const detectedSources = selectedSource === 'AUTO'
+    ? isNumericId ? numericSources : textSources
+    : [selectedSource];
+
+  return detectedSources
+    .filter((key) => isNumericId ? !textSources.includes(key) : textSources.includes(key))
+    .flatMap((key) => {
+      const source = converterSources[key];
+      return source ? [{ key, label: source.label, url: source.buildUrl(id) }] : [];
+    });
+}
