@@ -27,7 +27,6 @@ export interface SyncDocument {
 }
 
 const ERROR_MESSAGES: Record<string, string> = {
-  AUTH_FAILED: '同步密碼錯誤。',
   RATE_LIMITED: '嘗試次數過多，請稍後再試。',
   ORIGIN_NOT_ALLOWED: '這個網站未獲同步服務授權。',
   PAYLOAD_TOO_LARGE: '同步資料過大，請先整理資料。',
