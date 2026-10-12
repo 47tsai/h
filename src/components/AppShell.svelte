@@ -406,7 +406,7 @@
     if (typeof value !== 'string' || value.length > 4096) return false;
     try {
       const url = new URL(value);
-      return url.protocol === 'https:' || url.protocol === 'http:';
+      return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password;
     } catch { return false; }
   }
 
@@ -781,7 +781,7 @@
   .toast { position:sticky; bottom:14px; margin:16px auto 0; width:fit-content; max-width:100%; padding:11px 15px; border:1px solid #62d8a344; background:var(--panel); border-radius:10px; box-shadow:0 8px 30px #0002; color:var(--text); font-size:10px; z-index:2; }.toast.error { border-color:#ff8f9b55; color:#ffabb3; }.toast button { margin-left:15px; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:15px; }
   .page-footer { display:flex; justify-content:space-between; gap:15px; color:#667188; font-size:8px; letter-spacing:.07em; margin-top:39px; }
   @media (max-width:760px) {
-    .app-frame { display:block; padding-bottom:75px; }.sidebar { position:fixed; z-index:5; bottom:0; left:0; right:0; width:auto; height:66px; padding:5px 7px max(5px,env(safe-area-inset-bottom)); border-right:0; border-top:1px solid var(--line); background:var(--panel); }.brand,.nav-label,.sidebar-bottom { display:none; }
+    .app-frame { display:block; padding-bottom:calc(75px + env(safe-area-inset-bottom)); }.sidebar { position:fixed; z-index:5; bottom:0; left:0; right:0; width:auto; height:calc(66px + env(safe-area-inset-bottom)); padding:5px 7px max(5px,env(safe-area-inset-bottom)); border-right:0; border-top:1px solid var(--line); background:var(--panel); }.brand,.nav-label,.sidebar-bottom { display:none; }
     nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
     .topbar { height:55px; padding:0 18px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.topbar-actions { gap:11px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
     .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
