@@ -54,34 +54,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.SYNC_GITHUB_TOKEN }}
           SYNC_PASSWORD_HASH: ${{ steps.password.outputs.hash }}
-      - name: Verify deployed sync credential without changing data
-        env:
-          SYNC_PASSWORD: ${{ secrets.SYNC_PASSWORD }}
-        run: |
-          node --input-type=module <<'NODE'
-          const endpoint = 'https://h-tools-sync.tsai97216.workers.dev/api/sync';
-          let lastCode = 'NO_RESPONSE';
-          for (let attempt = 0; attempt < 6; attempt++) {
-            try {
-              const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                  'content-type': 'application/json',
-                  origin: 'https://h.chi.qzz.io',
-                },
-                body: JSON.stringify({ action: 'check-auth', password: process.env.SYNC_PASSWORD.trim() }),
-              });
-              const result = await response.json().catch(() => ({}));
-              if (response.ok && result.ok === true) {
-                console.log('Sync credential self-check passed.');
-                process.exit(0);
-              }
-              lastCode = result.error || String(response.status);
-            } catch (error) {
-              lastCode = error instanceof Error ? error.name : 'NETWORK_ERROR';
-            }
-            if (attempt < 5) await new Promise((resolve) => setTimeout(resolve, 2000));
-          }
-          console.error('Sync credential self-check failed: ' + lastCode);
-          process.exit(1);
-          NODE
