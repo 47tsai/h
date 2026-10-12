@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
 
 const validDocument = () => ({
@@ -22,7 +22,7 @@ const validDocument = () => ({
   }],
 });
 
-async function send(document) {
+async function send(document, env = {}) {
   return worker.fetch(new Request('https://sync.example.com/api/sync', {
     method: 'POST',
     headers: {
@@ -30,8 +30,28 @@ async function send(document) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({ action: 'sync', document }),
-  }), { ALLOWED_ORIGIN: 'https://h.chi.qzz.io' });
+  }), { ALLOWED_ORIGIN: 'https://h.chi.qzz.io', ...env });
 }
+
+function mockGitHub(remoteDocument) {
+  const saved = [];
+  vi.stubGlobal('fetch', vi.fn(async (_url, options = {}) => {
+    if (!options.method || options.method === 'GET') {
+      return new Response(JSON.stringify({
+        sha: 'remote-sha',
+        content: btoa(JSON.stringify(remoteDocument)),
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    const body = JSON.parse(options.body);
+    saved.push(JSON.parse(atob(body.content)));
+    return new Response(JSON.stringify({ content: { sha: 'saved-sha' } }), {
+      status: 200, headers: { 'content-type': 'application/json' },
+    });
+  }));
+  return saved;
+}
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe('sync Worker request validation', () => {
   it('rejects duplicate IDs, URLs, and tombstone keys before remote access', async () => {
@@ -103,5 +123,52 @@ describe('sync Worker request validation', () => {
       body: 'not json',
     }), { ALLOWED_ORIGIN: 'https://h.chi.qzz.io' });
     expect(response.status).toBe(400);
+  });
+});
+
+
+describe('sync Worker merge behavior', () => {
+  const githubEnv = {
+    GITHUB_OWNER: 'owner',
+    GITHUB_REPO: 'repo',
+    GITHUB_TOKEN: 'test-token',
+    GITHUB_BRANCH: 'main',
+    GITHUB_FILE_PATH: 'data/sync.json',
+  };
+
+  it('does not resurrect a local record deleted on another device', async () => {
+    const local = validDocument();
+    const remote = validDocument();
+    remote.stopwatchRecords = [];
+    remote.tombstones = [{
+      key: 'stopwatchRecords:record-1',
+      entity: 'stopwatchRecords',
+      id: 'record-1',
+      deletedAt: 300,
+    }];
+    const saved = mockGitHub(remote);
+
+    const response = await send(local, githubEnv);
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.document.stopwatchRecords).toEqual([]);
+    expect(result.document.tombstones).toContainEqual(remote.tombstones[0]);
+    expect(saved).toHaveLength(1);
+    expect(saved[0].stopwatchRecords).toEqual([]);
+  });
+
+  it('uses remote data when matching records have equal timestamps', async () => {
+    const local = validDocument();
+    local.favorites[0].title = 'Local title';
+    const remote = validDocument();
+    remote.favorites[0].title = 'Remote title';
+    const saved = mockGitHub(remote);
+
+    const response = await send(local, githubEnv);
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.document.favorites).toHaveLength(1);
+    expect(result.document.favorites[0].title).toBe('Remote title');
+    expect(saved[0].favorites[0].title).toBe('Remote title');
   });
 });
