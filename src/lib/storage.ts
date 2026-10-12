@@ -69,7 +69,7 @@ export async function closeStorageDatabase(): Promise<void> {
 
 function getDatabase() {
   if (!globalThis.indexedDB) return Promise.reject(new Error('此環境不支援 IndexedDB，無法保存紀錄。'));
-  databasePromise ??= openDB<HToolsDB>('h-tools', 3, {
+  databasePromise ??= openDB<HToolsDB>('h-tools', 4, {
     upgrade(db, oldVersion) {
       if (oldVersion < 1 && !db.objectStoreNames.contains('stopwatch-records')) {
         const store = db.createObjectStore('stopwatch-records', { keyPath: 'id' });
