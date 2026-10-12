@@ -20,6 +20,50 @@ beforeEach(clearDatabase);
 afterEach(async () => {
   vi.unstubAllGlobals();
   await clearDatabase();
+});
+
+describe('applying cloud sync results', () => {
+  it('replaces a same-URL favorite with the canonical merged ID instead of duplicating it', async () => {
+    await saveFavorite({
+      id: 'local-favorite',
+      url: 'https://example.com/shared',
+      title: 'Local title',
+      createdAt: 100,
+      updatedAt: 200,
+    });
+
+    const document = {
+      schemaVersion: 1 as const,
+      updatedAt: '2026-10-12T12:00:00.000Z',
+      settings: { theme: 'dark' as const },
+      stopwatchRecords: [],
+      resultHistory: [],
+      favorites: [{
+        id: 'remote-favorite',
+        url: 'https://example.com/shared',
+        title: 'Remote title',
+        createdAt: 90,
+        updatedAt: 200,
+      }],
+      tombstones: [],
+    };
+
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      ok: true,
+      syncedAt: '2026-10-12T12:01:00.000Z',
+      document,
+    }), { status: 200, headers: { 'content-type': 'application/json' } })));
+
+    await syncWithCloud('https://sync.example.com', 'dark');
+
+    expect(await listFavorites()).toEqual(document.favorites);
+    expect(await listSyncTombstones()).toContainEqual({
+      key: 'favorites:local-favorite',
+      entity: 'favorites',
+      id: 'local-favorite',
+      deletedAt: expect.any(Number),
+    });
+  });
 
   it('replaces a same-URL history item with the canonical merged ID', async () => {
     await recordResultAction({
@@ -63,51 +107,6 @@ afterEach(async () => {
       key: 'resultHistory:local-history',
       entity: 'resultHistory',
       id: 'local-history',
-      deletedAt: expect.any(Number),
-    });
-  });
-
-});
-
-describe('applying cloud sync results', () => {
-  it('replaces a same-URL favorite with the canonical merged ID instead of duplicating it', async () => {
-    await saveFavorite({
-      id: 'local-favorite',
-      url: 'https://example.com/shared',
-      title: 'Local title',
-      createdAt: 100,
-      updatedAt: 200,
-    });
-
-    const document = {
-      schemaVersion: 1 as const,
-      updatedAt: '2026-10-12T12:00:00.000Z',
-      settings: { theme: 'dark' as const },
-      stopwatchRecords: [],
-      resultHistory: [],
-      favorites: [{
-        id: 'remote-favorite',
-        url: 'https://example.com/shared',
-        title: 'Remote title',
-        createdAt: 90,
-        updatedAt: 200,
-      }],
-      tombstones: [],
-    };
-
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
-      ok: true,
-      syncedAt: '2026-10-12T12:01:00.000Z',
-      document,
-    }), { status: 200, headers: { 'content-type': 'application/json' } })));
-
-    await syncWithCloud('https://sync.example.com', 'dark');
-
-    expect(await listFavorites()).toEqual(document.favorites);
-    expect(await listSyncTombstones()).toContainEqual({
-      key: 'favorites:local-favorite',
-      entity: 'favorites',
-      id: 'local-favorite',
       deletedAt: expect.any(Number),
     });
   });
