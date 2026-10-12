@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-12T10:59:08.990Z",
+  "updatedAt": "2026-10-12T11:20:17.710Z",
   "settings": {
     "theme": "system"
   },
@@ -129,6 +129,15 @@
       "lastAction": "open",
       "lastActionAt": 1791802699575,
       "createdAt": 1791802699575
+    },
+    {
+      "id": "be434a18-2f44-4ec6-bc6b-49180dd035ee",
+      "url": "https://18comic.vip/photo/1444818",
+      "source": "JM",
+      "sourceLabel": "禁漫天堂",
+      "lastAction": "open",
+      "lastActionAt": 1791804003463,
+      "createdAt": 1791804003463
     }
   ],
   "favorites": [
