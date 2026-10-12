@@ -582,22 +582,22 @@
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol"><Icon name="timer" size={20} /></div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}><Icon name="trash" size={16} /></button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'settings'}
-        <section class="page-heading"><div><h1>設定</h1><p>管理外觀、本機資料備份，以及跨裝置同步。</p></div></section>
+        <section class="page-heading"><div><h1>設定</h1></div></section>
         <section class="settings-card">
-          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="settings" size={18} /></div><div><h2>外觀</h2><p>依照使用環境調整介面顯示。</p></div></div>
-          <div class="setting-row"><div><strong>介面主題</strong><p>系統模式會跟隨裝置的外觀設定。</p></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" aria-pressed={theme === option.id} onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="settings" size={18} /></div><div><h2>外觀</h2></div></div>
+          <div class="setting-row"><div><strong>介面主題</strong></div><div class="theme-options">{#each [{id:'system',label:'系統'},{id:'light',label:'淺色'},{id:'dark',label:'深色'}] as option}<button class:selected={theme === option.id} class="theme-option" aria-pressed={theme === option.id} onclick={() => applyTheme(option.id as Theme)}>{option.label}</button>{/each}</div></div>
         </section>
         <section class="settings-card settings-data-card">
-          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="copy" size={18} /></div><div><h2>資料管理</h2><p>資料目前保存在這個瀏覽器的 IndexedDB。清除瀏覽器網站資料也可能移除它們。</p></div></div>
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="copy" size={18} /></div><div><h2>資料管理</h2></div></div>
           <div class="settings-data-stats"><div><strong>{records.length}</strong><span>碼錶紀錄</span></div><div><strong>{resultHistory.length}</strong><span>歷史紀錄</span></div><div><strong>{favorites.length}</strong><span>收藏</span></div></div>
-          <div class="setting-row"><div><strong>匯出備份</strong><p>下載包含碼錶、歷史、收藏與主題偏好的 JSON 檔案，方便轉移或還原資料。</p></div><button class="secondary-button" disabled={dataBusy} onclick={() => void exportBackup()}><Icon name="external-link" size={15} /> 匯出 JSON</button></div>
-          <div class="setting-row"><div><strong>匯入備份</strong><p>匯入前會檢查檔案格式。資料會與現有內容合併，不會直接清空整個資料庫。</p></div><div class="setting-action"><input bind:this={importFileInput} class="visually-hidden-file" type="file" accept="application/json,.json" aria-label="選擇 H Tools 備份檔" onchange={importBackup} /><button class="secondary-button" disabled={dataBusy} onclick={() => importFileInput?.click()}><Icon name="paste" size={15} /> 選擇備份檔</button></div></div>
-          <div class="setting-row"><div><strong>清除本機資料</strong><p>刪除碼錶、歷史、收藏與進行中的碼錶狀態。主題偏好會保留，這項操作無法復原。</p></div><button class="danger-button" disabled={dataBusy} onclick={() => void clearAllLocalData()}><Icon name="trash" size={15} /> 清除資料</button></div>
+          <div class="setting-row"><div><strong>匯出備份</strong></div><button class="secondary-button" disabled={dataBusy} onclick={() => void exportBackup()}><Icon name="external-link" size={15} /> 匯出 JSON</button></div>
+          <div class="setting-row"><div><strong>匯入備份</strong></div><div class="setting-action"><input bind:this={importFileInput} class="visually-hidden-file" type="file" accept="application/json,.json" aria-label="選擇 H Tools 備份檔" onchange={importBackup} /><button class="secondary-button" disabled={dataBusy} onclick={() => importFileInput?.click()}><Icon name="paste" size={15} /> 選擇備份檔</button></div></div>
+          <div class="setting-row"><div><strong>清除本機資料</strong></div><button class="danger-button" disabled={dataBusy} onclick={() => void clearAllLocalData()}><Icon name="trash" size={15} /> 清除資料</button></div>
         </section>
         <section class="settings-card settings-sync-card">
-          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="history" size={18} /></div><div><h2>雲端同步</h2><p>規劃為手動雙向同步，讓不同裝置可以合併資料。</p></div><span class="setting-badge muted">尚未部署</span></div>
-          <div class="sync-explainer"><div class="sync-status-icon"><Icon name="history" size={20} /></div><div><strong>同步服務尚未連接</strong><p>目前資料只存在本機，不能直接跨裝置同步。要安全啟用同步，還需要部署 Cloudflare Worker、設定伺服器端密鑰，並連接私人 GitHub 儲存庫。同步密碼與 GitHub Token 不會放進前端。</p></div></div>
-          <div class="setting-row"><div><strong>同步方式</strong><p>手動觸發；同步成功後才更新狀態，不會在背景偷偷上傳。</p></div><button class="secondary-button" disabled title="同步服務尚未部署">立即同步</button></div>
+          <div class="settings-section-heading"><div class="settings-section-icon"><Icon name="history" size={18} /></div><div><h2>雲端同步</h2></div><span class="setting-badge muted">尚未部署</span></div>
+          
+          <div class="setting-row"><div><strong>同步</strong></div><button class="secondary-button" disabled title="同步服務尚未部署">立即同步</button></div>
         </section>
       {:else if activeSection === 'history'}
         <section class="page-heading"><div><h1>歷史紀錄</h1><p>開啟、複製或分享過的結果會自動整理在這裡。</p></div><span class="count-pill">{resultHistory.length} 筆</span></section>
