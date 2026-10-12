@@ -156,3 +156,71 @@ export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void>
   const current = await db.get('sync-tombstones', tombstone.key);
   if (!current || tombstone.deletedAt > current.deletedAt) await db.put('sync-tombstones', tombstone);
 }
+
+export async function importBackupData(
+  importedRecords: StopwatchRecord[],
+  importedHistory: ResultHistoryItem[],
+  importedFavorites: FavoriteItem[],
+): Promise<void> {
+  const db = await getDatabase();
+  const tx = db.transaction(
+    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    'readwrite',
+  );
+  const recordsStore = tx.objectStore('stopwatch-records');
+  const historyStore = tx.objectStore('result-history');
+  const favoritesStore = tx.objectStore('favorites');
+  const tombstonesStore = tx.objectStore('sync-tombstones');
+
+  try {
+    const [currentHistory, currentFavorites] = await Promise.all([
+      historyStore.getAll(),
+      favoritesStore.getAll(),
+    ]);
+    const historyByUrl = new Map(currentHistory.map((item) => [item.url, item]));
+    const historyById = new Map(currentHistory.map((item) => [item.id, item]));
+    const favoriteByUrl = new Map(currentFavorites.map((item) => [item.url, item]));
+    const favoriteById = new Map(currentFavorites.map((item) => [item.id, item]));
+    const writes: Promise<unknown>[] = [];
+
+    for (const item of importedRecords) {
+      writes.push(recordsStore.put(item));
+      writes.push(tombstonesStore.delete(`stopwatchRecords:${item.id}`));
+    }
+
+    for (const item of importedHistory) {
+      const existingByUrl = historyByUrl.get(item.url);
+      const idInUse = historyById.get(item.id);
+      const saved: ResultHistoryItem = {
+        ...item,
+        id: existingByUrl?.id ?? (idInUse && idInUse.url !== item.url ? crypto.randomUUID() : item.id),
+        createdAt: existingByUrl?.createdAt ?? item.createdAt,
+      };
+      writes.push(historyStore.put(saved));
+      writes.push(tombstonesStore.delete(`resultHistory:${saved.id}`));
+      historyByUrl.set(saved.url, saved);
+      historyById.set(saved.id, saved);
+    }
+
+    for (const item of importedFavorites) {
+      const existingByUrl = favoriteByUrl.get(item.url);
+      const idInUse = favoriteById.get(item.id);
+      const saved: FavoriteItem = {
+        ...item,
+        id: existingByUrl?.id ?? (idInUse && idInUse.url !== item.url ? crypto.randomUUID() : item.id),
+        createdAt: existingByUrl?.createdAt ?? item.createdAt,
+      };
+      writes.push(favoritesStore.put(saved));
+      writes.push(tombstonesStore.delete(`favorites:${saved.id}`));
+      favoriteByUrl.set(saved.url, saved);
+      favoriteById.set(saved.id, saved);
+    }
+
+    await Promise.all(writes);
+    await tx.done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* The transaction may already have completed or aborted. */ }
+    throw error;
+  }
+}
+
