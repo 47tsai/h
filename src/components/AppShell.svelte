@@ -389,7 +389,7 @@
       document.body.appendChild(link);
       link.click();
       link.remove();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       notice = '備份已匯出，請妥善保存 JSON 檔案。';
     } catch (error) {
       storageError = error instanceof Error ? error.message : '匯出備份失敗。';
