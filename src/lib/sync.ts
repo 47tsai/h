@@ -126,6 +126,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     }
     return true;
   };
+  const tombstoneKeys = new Set(document.tombstones.filter(validTombstone).map((item) => item.key));
 
   return document.stopwatchRecords.length <= 10000
     && document.resultHistory.length <= 10000 && document.favorites.length <= 10000
@@ -139,7 +140,10 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     && hasUniqueValues(document.resultHistory, (item) => item.url)
     && hasUniqueValues(document.favorites, (item) => item.id)
     && hasUniqueValues(document.favorites, (item) => item.url)
-    && hasUniqueValues(document.tombstones, (item) => item.key);
+    && hasUniqueValues(document.tombstones, (item) => item.key)
+    && document.stopwatchRecords.every((item) => !tombstoneKeys.has('stopwatchRecords:' + item.id))
+    && document.resultHistory.every((item) => !tombstoneKeys.has('resultHistory:' + item.id))
+    && document.favorites.every((item) => !tombstoneKeys.has('favorites:' + item.id));
 }
 
 function validateResponse(value: unknown): value is { ok: true; document: SyncDocument; syncedAt: string } {
