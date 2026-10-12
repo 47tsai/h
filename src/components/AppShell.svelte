@@ -1,7 +1,27 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
-  import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, importBackupData, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
+  import {
+    formatDuration,
+    getElapsedMs,
+    isRunningState,
+    localDateKey,
+    type RunningState,
+  } from '../lib/stopwatch';
+  import {
+    deleteFavorite,
+    deleteResultHistory,
+    deleteStopwatchRecord,
+    importBackupData,
+    listFavorites,
+    listResultHistory,
+    listStopwatchRecords,
+    recordResultAction,
+    saveFavorite,
+    saveStopwatchRecord,
+    type FavoriteItem,
+    type ResultHistoryItem,
+    type StopwatchRecord,
+  } from '../lib/storage';
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
   import { buildConversionResults, converterSources, sourceForUrl } from '../lib/converter-sources';
@@ -42,7 +62,6 @@
   let converterUrl = '';
   let converterUrls: string[] = [];
   let converterResults: { key: string; label: string; url: string }[] = [];
-
 
   function updateConverterOutput() {
     converterResults = buildConversionResults(converterInput, converterSite);
@@ -112,8 +131,27 @@
   $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
   $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
-  $: filteredResultHistory = resultHistory.filter((item) => [item.url, item.sourceLabel].some((value) => value.toLocaleLowerCase().includes(resultQuery.toLocaleLowerCase()))).sort((a,b) => resultSort === 'oldest' ? a.lastActionAt-b.lastActionAt : b.lastActionAt-a.lastActionAt);
-  $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? '', favoriteSourceLabel(item)].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase()))).sort((a, b) => favoriteSort === 'oldest' ? a.createdAt - b.createdAt : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW') : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt : b.createdAt - a.createdAt);
+  $: filteredResultHistory = resultHistory
+    .filter((item) =>
+      [item.url, item.sourceLabel].some((value) =>
+        value.toLocaleLowerCase().includes(resultQuery.toLocaleLowerCase()),
+      ),
+    )
+    .sort((a, b) =>
+      resultSort === 'oldest' ? a.lastActionAt - b.lastActionAt : b.lastActionAt - a.lastActionAt,
+    );
+  $: filteredFavorites = favorites
+    .filter((item) =>
+      [item.title, item.url, item.notes ?? '', favoriteSourceLabel(item)].some((value) =>
+        value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase()),
+      ),
+    )
+    .sort((a, b) =>
+      favoriteSort === 'oldest' ? a.createdAt - b.createdAt
+        : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW')
+        : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt
+        : b.createdAt - a.createdAt,
+    );
   $: favoriteGroups = groupFavorites(filteredFavorites);
   $: elapsedLabel = formatDuration(elapsedMs);
 
