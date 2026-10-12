@@ -16,7 +16,7 @@ afterEach(async () => {
 });
 
 describe('IndexedDB schema migration', () => {
-  it('upgrades a v1 database to v3 without losing stopwatch records', async () => {
+  it('upgrades a v1 database to v4 without losing stopwatch records', async () => {
     const legacyRecord = {
       id: 'legacy-record',
       startedAt: 1_000,
@@ -39,8 +39,8 @@ describe('IndexedDB schema migration', () => {
     expect(await storage.listStopwatchRecords()).toEqual([legacyRecord]);
     expect(await storage.listFavorites()).toEqual([]);
 
-    const upgradedDb = await openDB(databaseName, 3);
-    expect(Array.from(upgradedDb.objectStoreNames)).toEqual(['favorites', 'result-history', 'stopwatch-records']);
+    const upgradedDb = await openDB(databaseName, 4);
+    expect(Array.from(upgradedDb.objectStoreNames)).toEqual(['favorites', 'result-history', 'stopwatch-records', 'sync-tombstones']);
     expect(Array.from(upgradedDb.transaction('favorites').store.indexNames)).toEqual(['by-createdAt', 'by-title']);
     expect(Array.from(upgradedDb.transaction('result-history').store.indexNames)).toEqual(['by-lastActionAt', 'by-url']);
     expect(await upgradedDb.get('stopwatch-records', 'legacy-record')).toEqual(legacyRecord);
