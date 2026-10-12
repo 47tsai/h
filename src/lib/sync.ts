@@ -186,11 +186,10 @@ async function applyRemoteDocument(document: SyncDocument): Promise<void> {
   const historyIds = new Set(document.resultHistory.map((item) => item.id));
   const historyUrls = new Set(document.resultHistory.map((item) => item.url));
   const favoriteIds = new Set(document.favorites.map((item) => item.id));
-  const favoriteUrls = new Set(document.favorites.map((item) => item.url));
 
   for (const item of localRecords) if (!recordIds.has(item.id)) await deleteStopwatchRecord(item.id);
   for (const item of localHistory) if (!historyIds.has(item.id) && !historyUrls.has(item.url)) await deleteResultHistory(item.id);
-  for (const item of localFavorites) if (!favoriteIds.has(item.id) && !favoriteUrls.has(item.url)) await deleteFavorite(item.id);
+  for (const item of localFavorites) if (!favoriteIds.has(item.id)) await deleteFavorite(item.id);
 
   for (const tombstone of document.tombstones) await saveSyncTombstone(tombstone);
   for (const item of document.stopwatchRecords) await saveStopwatchRecord(item);
