@@ -650,12 +650,12 @@
             <label class="converter-source-label" for="converter-site">來源</label>
             <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }}>
               <option value="AUTO">自動識別</option>
-              <option value="N">N站</option>
-              <option value="W">W站</option>
-              <option value="JM">JM站</option>
-              <option value="P">P站</option>
-              <option value="M">M站</option>
-              <option value="J">J站</option>
+              <option value="N">N 站（nhentai）</option>
+              <option value="W">紳士漫畫</option>
+              <option value="JM">禁漫天堂</option>
+              <option value="P">Pixiv</option>
+              <option value="M">MissAV</option>
+              <option value="J">Jable</option>
             </select>
             <div class="converter-input-wrap">
               <input id="converter-id" class="converter-id-input" bind:value={converterInput} oninput={() => { converterInput = converterInput.toLowerCase(); updateConverterOutput(); }} placeholder="輸入編號或文字" aria-label="作品編號或文字" />
