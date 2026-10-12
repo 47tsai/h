@@ -56,6 +56,26 @@ describe('sync Worker request validation', () => {
     expect((await send(duplicateTombstone)).status).toBe(400);
   });
 
+  it('rejects live records that conflict with deletion tombstones', async () => {
+    const recordConflict = validDocument();
+    recordConflict.tombstones.push({
+      key: 'stopwatchRecords:record-1', entity: 'stopwatchRecords', id: 'record-1', deletedAt: 300,
+    });
+    expect((await send(recordConflict)).status).toBe(400);
+
+    const historyConflict = validDocument();
+    historyConflict.tombstones.push({
+      key: 'resultHistory:history-1', entity: 'resultHistory', id: 'history-1', deletedAt: 300,
+    });
+    expect((await send(historyConflict)).status).toBe(400);
+
+    const favoriteConflict = validDocument();
+    favoriteConflict.tombstones.push({
+      key: 'favorites:favorite-1', entity: 'favorites', id: 'favorite-1', deletedAt: 300,
+    });
+    expect((await send(favoriteConflict)).status).toBe(400);
+  });
+
   it('rejects non-JSON requests without trying to sync', async () => {
     const response = await worker.fetch(new Request('https://sync.example.com/api/sync', {
       method: 'POST',
