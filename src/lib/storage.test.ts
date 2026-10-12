@@ -32,6 +32,8 @@ const sampleFavorite = (overrides: Partial<FavoriteItem> = {}): FavoriteItem => 
 });
 
 async function clearDatabase() {
+  // Let the production storage module create and migrate the schema before opening the test cleanup connection.
+  await listStopwatchRecords();
   const db = await openDB('h-tools', 2);
   await Promise.all([db.clear('stopwatch-records'), db.clear('favorites')]);
   db.close();
