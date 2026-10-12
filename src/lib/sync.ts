@@ -16,8 +16,6 @@ import {
   type SyncTombstone,
 } from './storage';
 
-type SyncEntityName = 'stopwatchRecords' | 'resultHistory' | 'favorites';
-
 export interface SyncDocument {
   schemaVersion: 1;
   updatedAt: string;
