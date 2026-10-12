@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import {
+  applySyncSnapshotIfUnchanged,
   deleteFavorite,
   deleteStopwatchRecord,
   importBackupData,
@@ -49,6 +50,26 @@ async function clearDatabase() {
 
 beforeEach(clearDatabase);
 afterEach(clearDatabase);
+
+describe('atomic sync snapshot application', () => {
+  it('refuses to replace data when the local snapshot has changed', async () => {
+    const local = sampleFavorite({ id: 'changed-locally', title: 'Keep this local change' });
+    await saveFavorite(local);
+
+    const applied = await applySyncSnapshotIfUnchanged(
+      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+      {
+        stopwatchRecords: [],
+        resultHistory: [],
+        favorites: [sampleFavorite({ id: 'remote-item', url: 'https://example.com/remote' })],
+        tombstones: [],
+      },
+    );
+
+    expect(applied).toBe(false);
+    expect(await listFavorites()).toEqual([local]);
+  });
+});
 
 describe('IndexedDB stopwatch records', () => {
   it('saves and reads records newest first', async () => {
