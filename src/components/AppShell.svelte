@@ -336,7 +336,6 @@
 
   let importFileInput: HTMLInputElement | undefined;
   let dataBusy = false;
-  let syncPassword = '';
   let syncBusy = false;
   let syncError = '';
   let lastSyncedAt = '';
@@ -344,12 +343,12 @@
   const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
 
   async function runCloudSync() {
-    if (!syncWorkerUrl || !syncPassword.trim() || syncBusy) return;
+    if (!syncWorkerUrl || syncBusy) return;
     syncBusy = true;
     syncError = '';
     notice = '';
     try {
-      const result = await syncWithCloud(syncWorkerUrl, syncPassword, theme);
+      const result = await syncWithCloud(syncWorkerUrl, theme);
       lastSyncedAt = result.syncedAt;
       try { localStorage.setItem('h-tools-last-synced-at', result.syncedAt); } catch { /* Status remains available for this session. */ }
       const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
@@ -364,7 +363,6 @@
     } catch (error) {
       syncError = error instanceof Error ? error.message : '同步失敗，請稍後再試。';
     } finally {
-      syncPassword = '';
       syncBusy = false;
     }
   }
@@ -630,10 +628,9 @@
         <section class="settings-card settings-sync-card">
           <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">{syncWorkerUrl ? (lastSyncedAt ? '已連接' : '待同步') : '未設定'}</span></div>
           {#if syncWorkerUrl}
-            <form class="sync-controls" onsubmit={(event) => { event.preventDefault(); void runCloudSync(); }}>
-              <input type="password" bind:value={syncPassword} autocomplete="off" placeholder="同步密碼" aria-label="同步密碼" />
-              <button class="secondary-button" type="submit" disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
-            </form>
+            <div class="sync-controls">
+              <button class="secondary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy}>{syncBusy ? '同步中…' : '立即同步'}</button>
+            </div>
           {:else}
             <div class="setting-row"><div><strong>尚未設定同步服務</strong></div><button class="secondary-button" disabled>立即同步</button></div>
           {/if}
