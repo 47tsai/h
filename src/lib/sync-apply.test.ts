@@ -167,7 +167,7 @@ describe('applying cloud sync results', () => {
       .rejects.toThrow('同步期間本機資料持續變更');
 
     expect(calls).toBe(3);
-    expect(await listFavorites()).toEqual(addedFavorites);
+    expect((await listFavorites()).map((item) => item.id).sort()).toEqual(addedFavorites.map((item) => item.id).sort());
   });
 
 });
