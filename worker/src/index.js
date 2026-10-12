@@ -281,10 +281,7 @@ export default {
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    const passwordHash = env.SYNC_PASSWORD_HASH;
-    if (!passwordHash || !(await verifyPassword(payload.password, passwordHash))) {
-      return fail('AUTH_FAILED', 401, allowedOrigin);
-    }
+    // Password verification is disabled for now to restore one-tap sync.
     if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
     if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
