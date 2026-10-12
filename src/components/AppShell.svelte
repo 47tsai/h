@@ -406,10 +406,10 @@
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
-        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>輸入編號，選擇來源，查看轉換結果。</p></div><div class="heading-chip"><span class="pulse"></span>預覽介面</div></section>
+        <section class="page-heading"><h1>編號轉換</h1></section>
         <section class="converter-layout">
           <div class="converter-source-card">
-            <label class="converter-source-label" for="converter-site">來源網站</label>
+            <label class="converter-source-label" for="converter-site">來源</label>
             <select id="converter-site" class="converter-site-select" bind:value={converterSite} onchange={() => updateConverterOutput()}>
               <option value="AUTO">自動識別</option>
               <option value="N">N站</option>
@@ -425,7 +425,7 @@
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
             </div>
-            <p class="converter-hint">可手動選擇來源，或依編號位數自動識別：5 位 W、6 位 N 與 W、7 位 JM、8 位 P。</p>
+            
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
@@ -448,7 +448,7 @@
               </div>
             {:else}
               <div class="converter-output-row">
-                <div class="converter-output-text" aria-live="polite">{converterOutput || '輸入編號後會在此顯示結果'}</div>
+                <div class="converter-output-text" aria-live="polite">{converterOutput || '轉換結果'}</div>
                 <div class="converter-output-actions">
                   <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}>▢</button>
                   <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}>↗</button>
@@ -458,11 +458,6 @@
                 <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
               </div>
             {/if}
-            <div class="converter-preview-note"><span>ⓘ</span> 自動識別 6 位數時會分別顯示 N 站與 W 站結果，可各自開啟或複製。</div>
-          </div>
-          <div class="converter-footer-actions">
-            <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
-            <button class="text-button" onclick={() => activeSection = 'settings'}>主題設定 →</button>
           </div>
         </section>
       {:else}
