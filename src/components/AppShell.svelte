@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
-  import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
+  import { deleteFavorite, deleteResultHistory, deleteStopwatchRecord, importBackupData, listFavorites, listResultHistory, listStopwatchRecords, recordResultAction, saveFavorite, saveStopwatchRecord, type FavoriteItem, type ResultHistoryItem, type StopwatchRecord } from '../lib/storage';
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
 
@@ -455,33 +455,25 @@
           && ['createdAt', 'updatedAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
       });
       if (!validRecords || !validHistory || !validFavorites) throw new Error('備份包含無效資料，未匯入任何內容。');
+      const hasUniqueIds = (items: unknown[]) => {
+        const ids = items.map((value) => (value as { id: string }).id);
+        return new Set(ids).size === ids.length;
+      };
+      const hasUniqueUrls = (items: unknown[]) => {
+        const urls = items.map((value) => (value as { url: string }).url);
+        return new Set(urls).size === urls.length;
+      };
+      if (!hasUniqueIds(importedRecords) || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
+        || !hasUniqueUrls(importedHistory) || !hasUniqueUrls(importedFavorites)) {
+        throw new Error('備份內有重複的 ID 或網址，為避免覆蓋錯誤資料，已取消匯入。');
+      }
       if (!window.confirm(`即將合併備份資料：${importedRecords.length} 筆碼錶、${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
 
-      for (const rawItem of importedRecords) await saveStopwatchRecord(rawItem as StopwatchRecord);
-      const currentHistory = await listResultHistory();
-      for (const rawItem of importedHistory) {
-        const item = rawItem as ResultHistoryItem;
-        const existingByUrl = currentHistory.find((current) => current.url === item.url);
-        const idInUse = currentHistory.some((current) => current.id === item.id && current.url !== item.url);
-        await recordResultAction({
-          ...item,
-          id: existingByUrl?.id ?? (idInUse ? crypto.randomUUID() : item.id),
-          createdAt: existingByUrl?.createdAt ?? item.createdAt,
-        });
-      }
-      let currentFavorites = await listFavorites();
-      for (const rawItem of importedFavorites) {
-        const item = rawItem as FavoriteItem;
-        const existingByUrl = currentFavorites.find((current) => current.url === item.url);
-        const idInUse = currentFavorites.some((current) => current.id === item.id && current.url !== item.url);
-        const saved: FavoriteItem = {
-          ...item,
-          id: existingByUrl?.id ?? (idInUse ? crypto.randomUUID() : item.id),
-          createdAt: existingByUrl?.createdAt ?? item.createdAt,
-        };
-        await saveFavorite(saved);
-        currentFavorites = [...currentFavorites.filter((current) => current.id !== saved.id && current.url !== saved.url), saved];
-      }
+      await importBackupData(
+        importedRecords as StopwatchRecord[],
+        importedHistory as ResultHistoryItem[],
+        importedFavorites as FavoriteItem[],
+      );
       records = await listStopwatchRecords();
       resultHistory = await listResultHistory();
       favorites = await listFavorites();
