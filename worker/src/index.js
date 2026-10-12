@@ -161,27 +161,6 @@ function mergeDocuments(local, remote) {
   return merged;
 }
 
-async function verifyPassword(password, encoded) {
-  if (typeof password !== 'string' || password.length < 1 || password.length > 1024
-    || typeof encoded !== 'string') return false;
-  const [algorithm, iterationsText, saltText, expectedText] = encoded.split('$');
-  const iterations = Number(iterationsText);
-  if (algorithm !== 'pbkdf2-sha256' || !Number.isInteger(iterations) || iterations < 100000 || iterations > 1000000
-    || !saltText || !expectedText) return false;
-  try {
-    const salt = Uint8Array.from(atob(saltText), (char) => char.charCodeAt(0));
-    const expected = Uint8Array.from(atob(expectedText), (char) => char.charCodeAt(0));
-    const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-    const derived = new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, expected.length * 8));
-    if (derived.length !== expected.length) return false;
-    let difference = 0;
-    for (let i = 0; i < derived.length; i++) difference |= derived[i] ^ expected[i];
-    return difference === 0;
-  } catch {
-    return false;
-  }
-}
-
 async function githubRequest(env, method, body, sha) {
   const owner = env.GITHUB_OWNER;
   const repo = env.GITHUB_REPO;
@@ -275,19 +254,12 @@ export default {
     }
     let payload;
     try { payload = JSON.parse(raw); } catch { return fail('BAD_REQUEST', 400, allowedOrigin); }
-    if (!isPlainObject(payload) || !['sync', 'check-auth'].includes(payload.action)) return fail('BAD_REQUEST', 400, allowedOrigin);
+    if (!isPlainObject(payload) || payload.action !== 'sync') return fail('BAD_REQUEST', 400, allowedOrigin);
 
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    if (typeof env.SYNC_PASSWORD_HASH !== 'string' || !env.SYNC_PASSWORD_HASH) {
-      return fail('SERVER_NOT_CONFIGURED', 500, allowedOrigin);
-    }
-    if (!(await verifyPassword(payload.password, env.SYNC_PASSWORD_HASH))) {
-      return fail('AUTH_FAILED', 401, allowedOrigin);
-    }
-    if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
     if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
     let local = payload.document;
