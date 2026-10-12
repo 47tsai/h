@@ -65,10 +65,15 @@ function isTimestamp(value: unknown): value is number {
   return Number.isSafeInteger(value) && Number(value) >= 0;
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowed: string[]): boolean {
+  return Object.keys(value).every((key) => allowed.includes(key));
+}
+
 export function isValidSyncDocument(value: unknown): value is SyncDocument {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const document = value as Record<string, unknown>;
-  if (document.schemaVersion !== 1 || typeof document.updatedAt !== 'string'
+  if (!hasOnlyKeys(document, ['schemaVersion', 'updatedAt', 'settings', 'stopwatchRecords', 'resultHistory', 'favorites', 'tombstones'])
+    || document.schemaVersion !== 1 || typeof document.updatedAt !== 'string'
     || !Number.isFinite(Date.parse(document.updatedAt))) return false;
 
   const settings = document.settings;
@@ -83,7 +88,8 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   const validRecord = (value: unknown): value is StopwatchRecord => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
-    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+    return hasOnlyKeys(item, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
+      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && typeof item.title === 'string' && item.title.length <= 500
       && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
       && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
@@ -91,7 +97,8 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   const validHistoryItem = (value: unknown): value is ResultHistoryItem => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
-    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+    return hasOnlyKeys(item, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
+      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && isSafeHttpUrl(item.url)
       && typeof item.source === 'string' && item.source.length <= 200
       && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
@@ -101,7 +108,8 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   const validFavorite = (value: unknown): value is FavoriteItem => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
-    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+    return hasOnlyKeys(item, ['id', 'source', 'url', 'title', 'notes', 'createdAt', 'updatedAt'])
+      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && isSafeHttpUrl(item.url)
       && typeof item.title === 'string' && item.title.length <= 500
       && (item.source === undefined || (typeof item.source === 'string' && item.source.length <= 200))
@@ -111,7 +119,8 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   const validTombstone = (value: unknown): value is SyncTombstone => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
-    return ['stopwatchRecords', 'resultHistory', 'favorites'].includes(String(item.entity))
+    return hasOnlyKeys(item, ['key', 'entity', 'id', 'deletedAt'])
+      && ['stopwatchRecords', 'resultHistory', 'favorites'].includes(String(item.entity))
       && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && item.key === String(item.entity) + ':' + item.id && isTimestamp(item.deletedAt);
   };
