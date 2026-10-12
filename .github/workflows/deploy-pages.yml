@@ -3,6 +3,8 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'data/sync.json'
   workflow_dispatch:
 
 permissions:
@@ -37,7 +39,7 @@ jobs:
       - name: Preserve custom domain
         run: |
           mkdir -p dist
-          printf '%s\n' 'h.chi.qzz.io' > dist/CNAME
+          printf '%s\\n' 'h.chi.qzz.io' > dist/CNAME
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
