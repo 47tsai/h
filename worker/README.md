@@ -9,7 +9,7 @@ In `tsai97216/h`, open **Settings → Secrets and variables → Actions → New 
 - `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** and **Account Settings: Read** permissions for the target account.
 - `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID.
 - `SYNC_GITHUB_TOKEN`: a fine-grained GitHub token limited to `tsai97216/h`, with **Contents: Read and write** permission.
-- `SYNC_PASSWORD`: a unique sync password of at least 16 characters. Do not reuse your GitHub or Cloudflare password.
+- `SYNC_PASSWORD`: a unique sync password of at least 8 characters. Do not reuse your GitHub or Cloudflare password.
 
 The workflow derives a salted PBKDF2-SHA256 hash from `SYNC_PASSWORD` during deployment and uploads only the hash as the Worker secret `SYNC_PASSWORD_HASH`. It uploads `SYNC_GITHUB_TOKEN` to the Worker as `GITHUB_TOKEN`. Do not put any of these values in source files or paste them into chat.
 
