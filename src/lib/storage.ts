@@ -85,6 +85,9 @@ function getDatabase() {
         store.createIndex('by-lastActionAt', 'lastActionAt');
         store.createIndex('by-url', 'url', { unique: true });
       }
+      if (oldVersion < 4 && !db.objectStoreNames.contains('sync-tombstones')) {
+        db.createObjectStore('sync-tombstones', { keyPath: 'key' });
+      }
     },
   });
   return databasePromise;
@@ -100,7 +103,10 @@ export async function saveStopwatchRecord(record: StopwatchRecord): Promise<void
 }
 export async function deleteStopwatchRecord(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.delete('stopwatch-records', id);
+  const tx = db.transaction(['stopwatch-records', 'sync-tombstones'], 'readwrite');
+  await tx.objectStore('stopwatch-records').delete(id);
+  await tx.objectStore('sync-tombstones').put({ key: `stopwatchRecords:${id}`, entity: 'stopwatchRecords', id, deletedAt: Date.now() });
+  await tx.done;
 }
 
 export async function listResultHistory(): Promise<ResultHistoryItem[]> {
@@ -114,7 +120,10 @@ export async function recordResultAction(item: ResultHistoryItem): Promise<void>
 }
 export async function deleteResultHistory(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.delete('result-history', id);
+  const tx = db.transaction(['result-history', 'sync-tombstones'], 'readwrite');
+  await tx.objectStore('result-history').delete(id);
+  await tx.objectStore('sync-tombstones').put({ key: `resultHistory:${id}`, entity: 'resultHistory', id, deletedAt: Date.now() });
+  await tx.done;
 }
 
 export async function listFavorites(): Promise<FavoriteItem[]> {
@@ -127,5 +136,19 @@ export async function saveFavorite(item: FavoriteItem): Promise<void> {
 }
 export async function deleteFavorite(id: string): Promise<void> {
   const db = await getDatabase();
-  await db.delete('favorites', id);
+  const tx = db.transaction(['favorites', 'sync-tombstones'], 'readwrite');
+  await tx.objectStore('favorites').delete(id);
+  await tx.objectStore('sync-tombstones').put({ key: `favorites:${id}`, entity: 'favorites', id, deletedAt: Date.now() });
+  await tx.done;
+}
+
+export async function listSyncTombstones(): Promise<SyncTombstone[]> {
+  const db = await getDatabase();
+  return db.getAll('sync-tombstones');
+}
+
+export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void> {
+  const db = await getDatabase();
+  const current = await db.get('sync-tombstones', tombstone.key);
+  if (!current || tombstone.deletedAt > current.deletedAt) await db.put('sync-tombstones', tombstone);
 }
