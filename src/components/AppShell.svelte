@@ -2,8 +2,7 @@
   import { onMount } from 'svelte';
   import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
   import { deleteFavorite, deleteStopwatchRecord, listFavorites, listStopwatchRecords, saveFavorite, saveStopwatchRecord, type FavoriteItem, type StopwatchRecord } from '../lib/storage';
-  import { convertInput, type ConversionResult } from '../lib/converter';
-  import { sourceRegistry } from '../lib/sourceRegistry';
+  import { convertInput } from '../lib/converter';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -33,8 +32,6 @@
   let recordQuery = '';
   let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let converterInput = '';
-  let selectedSourceId = 'auto';
-  let conversionResult: ConversionResult | null = null;
 
   $: elapsedMs = getElapsedMs(runningState, now);
   $: filteredRecords = records
@@ -204,22 +201,8 @@
   }
 
   function checkConverterInput() {
-    conversionResult = convertInput(
-      converterInput,
-      sourceRegistry,
-      selectedSourceId === 'auto' ? undefined : selectedSourceId,
-    );
-    notice = '';
-  }
-
-  async function copyConvertedUrl() {
-    if (!conversionResult?.ok) return;
-    try {
-      await navigator.clipboard.writeText(conversionResult.url);
-      notice = '已複製轉換網址。';
-    } catch {
-      notice = '瀏覽器未允許自動複製，請選取結果網址後手動複製。';
-    }
+    const result = convertInput(converterInput, []);
+    notice = result.ok ? result.url : result.message;
   }
 
   onMount(() => {
@@ -340,33 +323,8 @@
           {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
-        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>貼上影片網址自動辨識，或選擇來源後輸入影片編號。</p></div></section>
-        <section class="placeholder-card converter-card"><div class="placeholder-icon">↗</div><h2>影片編號轉換</h2><p>目前支援 YouTube 與 Bilibili 影片網址／編號；不支援的格式會顯示原因，不會猜測網址。</p>
-          <form class="converter-form" onsubmit={(event) => { event.preventDefault(); checkConverterInput(); }}>
-            <label for="converter-source">來源</label>
-            <select id="converter-source" bind:value={selectedSourceId} aria-label="選擇影片來源">
-              <option value="auto">自動辨識網址</option>
-              {#each sourceRegistry as source}
-                <option value={source.id}>{source.label}</option>
-              {/each}
-            </select>
-            <label for="converter-id">影片網址或編號</label>
-            <input id="converter-id" class="converter-input" bind:value={converterInput} placeholder="貼上影片網址或輸入編號" autocomplete="url" />
-            <button class="primary-button" type="submit">轉換網址</button>
-          </form>
-          {#if conversionResult}
-            {#if conversionResult.ok}
-              <div class="conversion-result" aria-live="polite">
-                <span class="result-label">轉換結果 · {conversionResult.sourceLabel}</span>
-                <a href={conversionResult.url} target="_blank" rel="noopener noreferrer">{conversionResult.url}</a>
-                <div class="favorite-form-actions"><button class="primary-button" type="button" onclick={copyConvertedUrl}>複製網址</button><a class="secondary-button" href={conversionResult.url} target="_blank" rel="noopener noreferrer">開啟影片 ↗</a></div>
-              </div>
-            {:else}
-              <p class="conversion-error" role="alert">{conversionResult.message}</p>
-            {/if}
-          {/if}
-          <small>自動辨識僅處理可確認的網址；輸入純編號時請手動選擇來源。</small>
-        </section>
+        <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>來源清單確認後，再逐項加入可靠的轉換規則。</p></div></section>
+        <section class="placeholder-card"><div class="placeholder-icon">↗</div><h2>轉換器的骨架已就位</h2><p>目前還沒加入任何來源規則，因此不會猜測網址或產生可能錯誤的連結。</p><label for="converter-id">測試輸入欄位</label><input id="converter-id" class="converter-input" bind:value={converterInput} placeholder="輸入編號或網址" /><button class="primary-button" onclick={checkConverterInput}>檢查輸入</button><small>來源註冊表與驗證規則會獨立實作，避免轉換邏輯散落在介面中。</small></section>
       {:else}
         <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
@@ -398,14 +356,6 @@
 </div>
 
 <style>
-  .converter-form { display:grid; gap:10px; margin-top:20px; text-align:left; }
-  .converter-form label { color:var(--muted); font-size:12px; }
-  .converter-form input,.converter-form select { width:100%; min-width:0; border:1px solid var(--line); border-radius:10px; padding:12px 13px; color:var(--text); background:var(--bg); font:inherit; }
-  .converter-form .primary-button { justify-self:start; margin-top:5px; }
-  .conversion-result { display:grid; gap:10px; margin-top:22px; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); text-align:left; overflow-wrap:anywhere; }
-  .result-label { color:var(--muted); font-size:11px; }
-  .conversion-result > a { color:var(--accent); }
-  .conversion-error { color:#f28b82; text-align:left; margin-top:18px; }
   .app-frame { --bg:#0b0e14; --panel:#111722; --panel-2:#151d2b; --line:#252e3d; --text:#e8edf7; --muted:#8a96aa; --accent:#9caeff; --accent-strong:#7892ff; display:flex; min-height:100vh; background:var(--bg); color:var(--text); }
   :global(:root[data-theme="light"]) .app-frame { --bg:#f4f6fb; --panel:#fff; --panel-2:#f8f9fd; --line:#e1e6f0; --text:#172033; --muted:#68758c; --accent:#405fdb; --accent-strong:#3452cb; }
   .sidebar { width:244px; flex:0 0 244px; border-right:1px solid var(--line); padding:27px 15px 18px; display:flex; flex-direction:column; background:var(--bg); }
