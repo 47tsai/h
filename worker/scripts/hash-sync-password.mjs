@@ -3,7 +3,6 @@ import { pbkdf2Sync, randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
 
 function hashPassword(password) {
-  password = password.trim();
   if (password.length < 8) throw new Error('Use at least 8 characters.');
   const salt = randomBytes(16);
   const iterations = 310000;
