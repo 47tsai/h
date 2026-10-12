@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-12T13:25:38.333Z",
+  "updatedAt": "2026-10-12T13:26:12.237Z",
   "settings": {
     "theme": "system"
   },
@@ -138,6 +138,15 @@
       "lastAction": "open",
       "lastActionAt": 1791804003463,
       "createdAt": 1791804003463
+    },
+    {
+      "id": "0f8aaf21-7b8f-4483-824b-bb4792442972",
+      "url": "https://nhentai.net/g/626943",
+      "source": "N",
+      "sourceLabel": "N 站",
+      "lastAction": "open",
+      "lastActionAt": 1791811556167,
+      "createdAt": 1791811556167
     }
   ],
   "favorites": [
