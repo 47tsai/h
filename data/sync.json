@@ -1,10 +1,17 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-12T10:04:44.175Z",
+  "updatedAt": "2026-10-12T10:18:02.869Z",
   "settings": {
     "theme": "system"
   },
-  "tombstones": [],
+  "tombstones": [
+    {
+      "key": "stopwatchRecords:61461320-ada0-4fc7-b5b6-90f561bec0e6",
+      "entity": "stopwatchRecords",
+      "id": "61461320-ada0-4fc7-b5b6-90f561bec0e6",
+      "deletedAt": 1791800279989
+    }
+  ],
   "stopwatchRecords": [
     {
       "id": "3f19cfcc-de71-4415-8ae1-ceb27e191c83",
@@ -15,6 +22,16 @@
       "createdAt": 1791792879866
     }
   ],
-  "resultHistory": [],
+  "resultHistory": [
+    {
+      "id": "35763e94-0a62-4829-8e3a-5a7c6837a4ad",
+      "url": "https://18comic.vip/photo/1459184",
+      "source": "JM",
+      "sourceLabel": "禁漫天堂",
+      "lastAction": "copy",
+      "lastActionAt": 1791800263612,
+      "createdAt": 1791800245977
+    }
+  ],
   "favorites": []
 }
