@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { formatDuration, getElapsedMs, isRunningState, localDateKey, type RunningState } from '../lib/stopwatch';
   import { deleteFavorite, deleteStopwatchRecord, listFavorites, listStopwatchRecords, saveFavorite, saveStopwatchRecord, type FavoriteItem, type StopwatchRecord } from '../lib/storage';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
-  type RunningState = { sessionStartedAt: number; startedAt: number; accumulatedMs: number; running: boolean };
   const navigation: { id: Section; label: string; icon: string; hint: string }[] = [
     { id: 'converter', label: '編號轉換', icon: '↗', hint: 'Converter' },
     { id: 'history', label: '歷史紀錄', icon: '◷', hint: 'History' },
@@ -30,9 +30,7 @@
   let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let converterInput = '';
 
-  $: elapsedMs = runningState
-    ? runningState.accumulatedMs + (runningState.running ? Math.max(0, now - runningState.startedAt) : 0)
-    : 0;
+  $: elapsedMs = getElapsedMs(runningState, now);
   $: filteredRecords = records
     .filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()))
     .sort((a, b) => recordSort === 'oldest' ? a.endedAt - b.endedAt
@@ -45,17 +43,6 @@
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
   $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())));
   $: elapsedLabel = formatDuration(elapsedMs);
-
-  function formatDuration(milliseconds: number): string {
-    const total = Math.floor(milliseconds / 1000);
-    return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
-      .map((value) => String(value).padStart(2, '0')).join(':');
-  }
-
-  function localDateKey(timestamp: number): string {
-    const date = new Date(timestamp);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }
 
   function makeTitle(timestamp: number): string {
     const date = new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
@@ -194,8 +181,8 @@
       const active = localStorage.getItem('h-tools-stopwatch-active');
       if (active) {
         const parsed = JSON.parse(active) as RunningState;
-        if (typeof parsed.sessionStartedAt === 'number' && typeof parsed.startedAt === 'number' &&
-          typeof parsed.accumulatedMs === 'number' && typeof parsed.running === 'boolean') runningState = parsed;
+        if (isRunningState(parsed)) runningState = parsed;
+        else localStorage.removeItem('h-tools-stopwatch-active');
       }
     } catch {
       storageError = '讀取本機設定失敗，部分狀態可能已重設。';
