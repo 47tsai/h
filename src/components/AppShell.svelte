@@ -25,6 +25,7 @@
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
   import { buildConversionResults, converterSources, sourceForUrl } from '../lib/converter-sources';
+  import { validateBackupData } from '../lib/backup';
 
   type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
@@ -438,14 +439,6 @@
     }
   }
 
-  function isSafeHttpUrl(value: unknown): value is string {
-    if (typeof value !== 'string' || value.length > 4096) return false;
-    try {
-      const url = new URL(value);
-      return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password;
-    } catch { return false; }
-  }
-
   async function importBackup(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -455,54 +448,8 @@
     try {
       if (file.size > MAX_BACKUP_BYTES) throw new Error('備份檔超過 10 MB，無法匯入。');
       const parsed: unknown = JSON.parse(await file.text());
-      if (!parsed || typeof parsed !== 'object') throw new Error('備份檔格式不正確。');
-      const backup = parsed as Record<string, unknown>;
-      if (backup.format !== 'h-tools-backup' || backup.schemaVersion !== 1) throw new Error('不支援這個備份格式或版本。');
-      const importedRecords = backup.stopwatchRecords;
-      const importedHistory = backup.resultHistory;
-      const importedFavorites = backup.favorites;
-      if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)
-        || importedRecords.length > 10000 || importedHistory.length > 10000 || importedFavorites.length > 10000) {
-        throw new Error('備份資料結構不正確，或單一類型資料超過 10,000 筆。');
-      }
-      const validRecords = importedRecords.every((value) => {
-        if (!value || typeof value !== 'object') return false;
-        const item = value as Record<string, unknown>;
-        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
-          && typeof item.title === 'string' && item.title.length <= 500
-          && ['startedAt', 'endedAt', 'durationMs', 'createdAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
-      });
-      const validHistory = importedHistory.every((value) => {
-        if (!value || typeof value !== 'object') return false;
-        const item = value as Record<string, unknown>;
-        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
-          && isSafeHttpUrl(item.url) && typeof item.source === 'string' && item.source.length <= 200
-          && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
-          && ['open', 'copy', 'share'].includes(String(item.lastAction))
-          && ['lastActionAt', 'createdAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
-      });
-      const validFavorites = importedFavorites.every((value) => {
-        if (!value || typeof value !== 'object') return false;
-        const item = value as Record<string, unknown>;
-        return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
-          && isSafeHttpUrl(item.url) && typeof item.title === 'string' && item.title.length <= 500
-          && (item.source === undefined || (typeof item.source === 'string' && item.source.length <= 200))
-          && (item.notes === undefined || (typeof item.notes === 'string' && item.notes.length <= 5000))
-          && ['createdAt', 'updatedAt'].every((key) => Number.isSafeInteger(item[key]) && Number(item[key]) >= 0);
-      });
-      if (!validRecords || !validHistory || !validFavorites) throw new Error('備份包含無效資料，未匯入任何內容。');
-      const hasUniqueIds = (items: unknown[]) => {
-        const ids = items.map((value) => (value as { id: string }).id);
-        return new Set(ids).size === ids.length;
-      };
-      const hasUniqueUrls = (items: unknown[]) => {
-        const urls = items.map((value) => (value as { url: string }).url);
-        return new Set(urls).size === urls.length;
-      };
-      if (!hasUniqueIds(importedRecords) || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
-        || !hasUniqueUrls(importedHistory) || !hasUniqueUrls(importedFavorites)) {
-        throw new Error('備份內有重複的 ID 或網址，為避免覆蓋錯誤資料，已取消匯入。');
-      }
+      const backup = validateBackupData(parsed);
+      const { stopwatchRecords: importedRecords, resultHistory: importedHistory, favorites: importedFavorites } = backup;
       if (!window.confirm(`即將合併備份資料：${importedRecords.length} 筆碼錶、${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
 
       await importBackupData(
