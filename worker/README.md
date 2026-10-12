@@ -1,45 +1,41 @@
 # H Tools Sync Worker
 
-The Worker is deployed automatically by GitHub Actions when files under `worker/` change, or when the workflow is run manually.
+Cloudflare Worker for manual, one-click synchronization between H Tools and the repository's sync document.
 
-## 1. GitHub Actions secrets
+## Deployment
 
-In `tsai97216/h`, open **Settings → Secrets and variables → Actions → New repository secret** and add:
+GitHub Actions deploys the Worker when files under `worker/` or its deployment workflow change. The workflow requires these GitHub repository secrets:
 
-- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token with **Workers Scripts: Edit** and **Account Settings: Read** permissions for the target account.
-- `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare account ID.
-- `SYNC_GITHUB_TOKEN`: a fine-grained GitHub token limited to `tsai97216/h`, with **Contents: Read and write** permission.
-- `SYNC_PASSWORD`: a unique sync password of at least 16 characters. Do not reuse your GitHub or Cloudflare password.
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `SYNC_GITHUB_TOKEN`
 
-The workflow derives a salted PBKDF2-SHA256 hash from `SYNC_PASSWORD` during deployment and uploads only the hash as the Worker secret `SYNC_PASSWORD_HASH`. It uploads `SYNC_GITHUB_TOKEN` to the Worker as `GITHUB_TOKEN`. Do not put any of these values in source files or paste them into chat.
+The GitHub token should have only the repository Contents permissions needed to read and update `data/sync.json`. The deployment workflow stores it in Cloudflare Worker Secrets as `GITHUB_TOKEN`.
 
-## 2. Worker configuration and public sync data
+## Configuration
 
-The Worker is configured to store the document in this repository at `data/sync.json`. The file is public by design, so anyone can read its contents. Do not sync sensitive or private information.
+The Worker configuration is in `wrangler.toml`. It currently targets:
 
-The Worker accepts browser requests only from `https://h.chi.qzz.io`. The GitHub token is scoped to this repository and kept in Worker Secrets at runtime.
+- Repository: `tsai97216/h`
+- Branch: `main`
+- File: `data/sync.json`
+- Allowed browser origin: `https://h.chi.qzz.io`
 
-## 3. Connect the site
+Set the GitHub repository variable `PUBLIC_SYNC_WORKER_URL` to the deployed Worker origin, without a trailing slash or `/api/sync`. The Pages workflow uses it when building the site.
 
-In GitHub, open **Settings → Secrets and variables → Actions → Variables**. Add a repository variable:
+## Data and access
 
-- Name: `PUBLIC_SYNC_WORKER_URL`
-- Value: the deployed Worker origin, such as `https://h-tools-sync.<your-account>.workers.dev`, with no trailing slash and no `/api/sync` suffix.
+The sync document is stored in this repository. This repository is public, so the contents of `data/sync.json` can be read by anyone. Do not sync sensitive or private information.
 
-The Pages workflow uses this variable to configure the frontend. Re-run the Pages workflow after setting it.
+The current one-click sync endpoint does not require a sync password. The Worker still restricts the target repository and file and applies request and data handling limits, but these are not user authentication. Anyone able to call the endpoint may be able to interfere with shared sync data.
 
-## 4. Deploy and verify
+## Local development
 
-1. Add all four repository secrets above.
-2. Add `PUBLIC_SYNC_WORKER_URL` after the Worker has deployed successfully for the first time.
-3. Run **Actions → Deploy Cloudflare Worker → Run workflow**.
-4. Open the site and use **Settings → Cloud Sync** to test a manual sync.
+From the repository root:
 
-A successful sync writes `data/sync.json` to the public repository. The Pages and CI workflows ignore commits that only change this data file, so syncing will not trigger unnecessary website builds.
+```sh
+npm install
+npm run dev
+```
 
-## Security notes
-
-- Never commit GitHub or Cloudflare tokens.
-- The sync password is sent over HTTPS and is never stored by the frontend.
-- The Worker validates payload size and schema, restricts the repository, branch, file path, browser origin, and request rate.
-- Deletion tombstones are retained so old devices do not silently restore deleted items.
+The Worker can be deployed manually with Wrangler from the `worker/` directory if Wrangler is configured for the target Cloudflare account.
