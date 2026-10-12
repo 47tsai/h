@@ -27,12 +27,22 @@
   let storageError = '';
   let notice = '';
   let recordQuery = '';
+  let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let converterInput = '';
 
   $: elapsedMs = runningState
     ? runningState.accumulatedMs + (runningState.running ? Math.max(0, now - runningState.startedAt) : 0)
     : 0;
-  $: filteredRecords = records.filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()));
+  $: filteredRecords = records
+    .filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()))
+    .sort((a, b) => recordSort === 'oldest' ? a.endedAt - b.endedAt
+      : recordSort === 'longest' ? b.durationMs - a.durationMs
+      : recordSort === 'shortest' ? a.durationMs - b.durationMs
+      : b.endedAt - a.endedAt);
+  $: todayKey = localDateKey(Date.now());
+  $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
+  $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
+  $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
   $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())));
   $: elapsedLabel = formatDuration(elapsedMs);
 
@@ -40,6 +50,11 @@
     const total = Math.floor(milliseconds / 1000);
     return [Math.floor(total / 3600), Math.floor((total % 3600) / 60), total % 60]
       .map((value) => String(value).padStart(2, '0')).join(':');
+  }
+
+  function localDateKey(timestamp: number): string {
+    const date = new Date(timestamp);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
   function makeTitle(timestamp: number): string {
@@ -269,9 +284,25 @@
         </section>
       {:else if activeSection === 'history'}
         <section class="page-heading"><div><div class="eyebrow">YOUR ACTIVITY</div><h1>歷史紀錄</h1><p>搜尋與管理本機保存的碼錶紀錄。</p></div></section>
-        <section class="records-section full-records"><label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋紀錄名稱…" aria-label="搜尋碼錶紀錄" /></label>
+        <section class="history-stats" aria-label="碼錶統計">
+          <article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong><small>筆紀錄</small></article>
+          <article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong><small>依結束日期統計</small></article>
+          <article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong><small>{records.length} 筆紀錄</small></article>
+        </section>
+        <section class="records-section full-records">
+          <div class="history-toolbar">
+            <label class="search-field"><span>⌕</span><input bind:value={recordQuery} placeholder="搜尋紀錄名稱…" aria-label="搜尋碼錶紀錄" /></label>
+            <label class="sort-field">排序
+              <select bind:value={recordSort} aria-label="歷史紀錄排序">
+                <option value="newest">最新優先</option>
+                <option value="oldest">最舊優先</option>
+                <option value="longest">時間最長</option>
+                <option value="shortest">時間最短</option>
+              </select>
+            </label>
+          </div>
           {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon">⌕</div><strong>{records.length ? '沒有符合的紀錄' : '目前沒有紀錄'}</strong><span>{records.length ? '試試其他關鍵字。' : '完成一次碼錶計時後，紀錄會出現在這裡。'}</span></div>
-          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>{new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
+          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol">◴</div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}>×</button></article>{/each}</div>{/if}
         </section>
       {:else if activeSection === 'converter'}
         <section class="page-heading"><div><div class="eyebrow">QUICK CONVERSION</div><h1>編號轉換</h1><p>來源清單確認後，再逐項加入可靠的轉換規則。</p></div></section>
@@ -344,6 +375,16 @@
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:22px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
   .setting-badge { border:1px solid #62d8a32a; color:#62d8a3; background:#62d8a30b; border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
+  .history-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
+  .history-stat { min-width:0; padding:17px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  .history-stat span,.history-stat small { display:block; color:var(--muted); font-size:10px; }
+  .history-stat strong { display:block; margin:11px 0 6px; font-size:clamp(17px,2vw,23px); font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  .history-stat small { font-size:9px; }
+  .history-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:13px; }
+  .history-toolbar .search-field { flex:1; margin:0; }
+  .sort-field { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; white-space:nowrap; }
+  .sort-field select { border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--panel); color:var(--text); font-size:10px; outline:none; }
+  .sort-field select:focus { border-color:var(--accent-strong); }
   .full-records { margin-top:0; }.search-field { display:flex; align-items:center; gap:9px; border:1px solid var(--line); border-radius:10px; padding:0 12px; height:43px; margin-bottom:13px; background:var(--panel); color:var(--muted); }.search-field span { font-size:21px; }.search-field input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--text); font-size:11px; }
   .placeholder-card { border:1px solid var(--line); border-radius:15px; padding:clamp(24px,5vw,44px); background:var(--panel); display:flex; align-items:flex-start; flex-direction:column; }.placeholder-icon { width:44px; height:44px; border:1px solid var(--line); border-radius:13px; background:var(--panel-2); display:grid; place-items:center; color:var(--accent); font-size:22px; margin-bottom:21px; }.placeholder-card h2 { font-size:16px; margin:0; }.placeholder-card p { font-size:11px; line-height:1.8; color:var(--muted); max-width:480px; margin:11px 0 24px; }.placeholder-card label { font-size:10px; color:var(--muted); margin-bottom:8px; }.converter-input { width:100%; max-width:460px; border:1px solid var(--line); background:var(--bg); color:var(--text); border-radius:9px; padding:12px; font-size:11px; outline:none; margin-bottom:12px; }.converter-input:focus,.search-field:focus-within { border-color:var(--accent-strong); }.placeholder-card > small { margin-top:14px; color:var(--muted); font-size:9px; line-height:1.6; }
   .toast { position:sticky; bottom:14px; margin:16px auto 0; width:fit-content; max-width:100%; padding:11px 15px; border:1px solid #62d8a344; background:var(--panel); border-radius:10px; box-shadow:0 8px 30px #0002; color:var(--text); font-size:10px; z-index:2; }.toast.error { border-color:#ff8f9b55; color:#ffabb3; }.toast button { margin-left:15px; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:15px; }
@@ -353,7 +394,7 @@
     nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
     .topbar { height:55px; padding:0 18px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.topbar-actions { gap:11px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
     .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
-    .records-section { margin-top:26px; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
+    .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 </style>
