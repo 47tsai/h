@@ -50,15 +50,87 @@ function isSafeWorkerUrl(value: string): boolean {
   }
 }
 
+function isSafeHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length > 4096) return false;
+  try {
+    const url = new URL(value);
+    return (url.protocol === 'https:' || url.protocol === 'http:')
+      && Boolean(url.hostname) && !url.username && !url.password;
+  } catch {
+    return false;
+  }
+}
+
+function isTimestamp(value: unknown): value is number {
+  return Number.isSafeInteger(value) && Number(value) >= 0;
+}
+
+function isValidSyncDocument(value: unknown): value is SyncDocument {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const document = value as Record<string, unknown>;
+  if (document.schemaVersion !== 1 || typeof document.updatedAt !== 'string'
+    || !Number.isFinite(Date.parse(document.updatedAt))) return false;
+
+  const settings = document.settings;
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return false;
+  const theme = (settings as Record<string, unknown>).theme;
+  if (Object.keys(settings).some((key) => key !== 'theme')
+    || (theme !== undefined && !['system', 'light', 'dark'].includes(String(theme)))) return false;
+
+  if (!Array.isArray(document.stopwatchRecords) || !Array.isArray(document.resultHistory)
+    || !Array.isArray(document.favorites) || !Array.isArray(document.tombstones)) return false;
+
+  const validRecord = (value: unknown): value is StopwatchRecord => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const item = value as Record<string, unknown>;
+    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && typeof item.title === 'string' && item.title.length <= 500
+      && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
+      && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
+  };
+  const validHistoryItem = (value: unknown): value is ResultHistoryItem => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const item = value as Record<string, unknown>;
+    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && isSafeHttpUrl(item.url)
+      && typeof item.source === 'string' && item.source.length <= 200
+      && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
+      && ['open', 'copy', 'share'].includes(String(item.lastAction))
+      && isTimestamp(item.lastActionAt) && isTimestamp(item.createdAt);
+  };
+  const validFavorite = (value: unknown): value is FavoriteItem => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const item = value as Record<string, unknown>;
+    return typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && isSafeHttpUrl(item.url)
+      && typeof item.title === 'string' && item.title.length <= 500
+      && (item.source === undefined || (typeof item.source === 'string' && item.source.length <= 200))
+      && (item.notes === undefined || (typeof item.notes === 'string' && item.notes.length <= 5000))
+      && isTimestamp(item.createdAt) && isTimestamp(item.updatedAt);
+  };
+  const validTombstone = (value: unknown): value is SyncTombstone => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    const item = value as Record<string, unknown>;
+    return ['stopwatchRecords', 'resultHistory', 'favorites'].includes(String(item.entity))
+      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && item.key === String(item.entity) + ':' + item.id && isTimestamp(item.deletedAt);
+  };
+
+  return document.stopwatchRecords.length <= 10000
+    && document.resultHistory.length <= 10000 && document.favorites.length <= 10000
+    && document.tombstones.length <= 30000
+    && document.stopwatchRecords.every(validRecord)
+    && document.resultHistory.every(validHistoryItem)
+    && document.favorites.every(validFavorite)
+    && document.tombstones.every(validTombstone);
+}
+
 function validateResponse(value: unknown): value is { ok: true; document: SyncDocument; syncedAt: string } {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const response = value as Record<string, unknown>;
-  const document = response.document as Record<string, unknown> | undefined;
   return response.ok === true && typeof response.syncedAt === 'string'
-    && Boolean(document) && document?.schemaVersion === 1
-    && Array.isArray(document?.stopwatchRecords) && Array.isArray(document?.resultHistory)
-    && Array.isArray(document?.favorites) && Array.isArray(document?.tombstones)
-    && Boolean(document?.settings) && typeof document?.settings === 'object';
+    && Number.isFinite(Date.parse(response.syncedAt))
+    && isValidSyncDocument(response.document);
 }
 
 async function createLocalDocument(theme: 'system' | 'light' | 'dark'): Promise<SyncDocument> {
