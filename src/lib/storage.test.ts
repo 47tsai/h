@@ -134,6 +134,17 @@ describe('atomic backup import', () => {
     expect(await listStopwatchRecords()).toEqual([]);
   });
 
+  it('rejects malformed fields and unsafe URLs before opening a write transaction', async () => {
+    const valid = sampleRecord({ id: 'must-not-write' });
+    const malformedRecord = sampleRecord({ id: 'bad-duration', durationMs: -1 });
+    await expect(importBackupData([valid, malformedRecord], [], [])).rejects.toThrow();
+    expect(await listStopwatchRecords()).toEqual([]);
+
+    const unsafeFavorite = sampleFavorite({ url: 'javascript:alert(1)' });
+    await expect(importBackupData([valid], [], [unsafeFavorite])).rejects.toThrow();
+    expect(await listStopwatchRecords()).toEqual([]);
+  });
+
   it('merges history by URL without violating the unique URL index', async () => {
     const { recordResultAction } = await import('./storage');
     const existing = {
