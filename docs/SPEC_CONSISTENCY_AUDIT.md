@@ -1,69 +1,31 @@
 # 規格一致性盤點
 
-> 盤點日期：2026-10-12
->
-> 狀態：已完成第一輪文件交叉檢查；尚未進入功能實作。本文件記錄已修正的文字不一致與仍需決定的項目。
+盤點日期：2026-10-12
 
-## 1. 已確認的共同原則
+本文件以目前程式碼與部署設定為準，記錄容易混淆的實際行為。
 
-- 本機優先：IndexedDB 是日常資料來源；離線或 Worker 故障時，核心功能仍可用。
-- 同步模式：只有使用者在設定頁主動發起時才同步，不做背景自動上傳。
-- 安全邊界：GitHub Token 僅存放在 Cloudflare Worker Secrets，前端不持有 Token。
-- 遠端儲存：初期規劃使用私人 GitHub 儲存庫與固定 JSON 路徑。
-- 合併方式：依穩定 ID 合併資料，使用刪除標記避免項目復活，透過 GitHub SHA 處理併發更新。
-- 碼錶：只做純碼錶，不做倒數、番茄鐘、任務命名或分類；以時間戳計算經過時間。
-- 來源擴充：各來源獨立實作並測試，尚未確認的來源不宣稱已支援。
+## 已確認
 
-## 2. 本輪已修正
+- 網站使用 Astro、Svelte 5、TypeScript 與 Tailwind CSS 4。
+- 網站部署目標為 GitHub Pages。
+- 本機資料由 IndexedDB 保存。
+- 同步只能由使用者在設定頁主動觸發。
+- 前端將同步文件傳給 Cloudflare Worker；Worker 代為存取 GitHub API。
+- 同步文件使用 schema version 1，欄位與合併規則見 `DATA_MODEL_AND_MERGE.md`。
+- Worker 使用 GitHub 檔案 SHA 處理寫入衝突，最多重試三次。
 
-### 2.1 同步授權描述
+## 重要差異與限制
 
-原本專案計畫仍保留「PKCE 或受保護後端／授權代理」的泛用選項，容易讓讀者誤以為前端將直接執行 GitHub 使用者授權。已調整為目前的規劃方向：專用同步密碼 + Cloudflare Worker，Worker 代理固定範圍的 GitHub API 操作。這仍是規劃方案，安全細節尚未實作或驗證。
+- 同步密碼欄位、密碼驗證端點與密碼雜湊部署已移除。
+- Worker 目前只檢查 Origin、請求格式及頻率，不具備真正的使用者身分驗證。
+- CORS 與 Origin 檢查無法阻止自行發送 HTTP 請求的客戶端偽造 Origin。
+- 同步檔案目前位於公開儲存庫 `tsai97216/h`，其內容可被任何人讀取。
+- `docs/PROJECT_PLAN.md`、`docs/IMPLEMENTATION_ROADMAP.md`、`docs/INTERFACE_AND_SOURCE_PLAN.md`、`docs/LOW_FIDELITY_WIREFRAMES.md` 與 `docs/PHASE_0_DECISION_MATRIX.md` 是規劃材料，不應當作目前實作狀態的證明。
 
-### 2.2 手動同步與待同步狀態
+## 參考位置
 
-介面規格曾使用「同步佇列」與「登入狀態」等文字，可能暗示背景同步或 GitHub 帳號登入。已改成「待同步變更」與「手動同步入口」，明確表示本機可以標記未同步變更，但不會自行上傳。
-
-### 2.3 README
-
-已建立根目錄 README，作為專案入口，連結所有主要規格文件，並明確標示目前只是規劃，不代表功能已完成。
-
-## 3. 仍需決定的項目
-
-### P0：開始 Phase 1 前需確認
-
-- [ ] 前端部署平台：GitHub Pages 或 Cloudflare Pages。
-- [ ] IndexedDB：原生 API 或輕量封裝函式庫。
-- [ ] 第一批來源：來源名稱、輸入格式、URL 規則與測試案例。
-- [ ] 第一版匯入／匯出是否納入範圍。
-- [ ] 測試、Lint、格式化與 CI 工具組合。
-- [ ] 專案正式網域與 Worker API Origin。
-
-### P1：Worker 開始實作前需確認
-
-- [ ] 同步密碼驗證方案及密碼雜湊格式。
-- [ ] 限流實作方式與計數範圍。
-- [ ] GitHub Token 的最小權限與輪替流程。
-- [ ] 單一 JSON 文件的大小上限與拆分門檻。
-- [ ] 衝突無法自動合併時的使用者介面。
-- [ ] 雲端資料清除與備份復原流程。
-
-### P2：可延後
-
-- [ ] PWA 與離線資源快取。
-- [ ] 收藏標籤、分類與進階備註。
-- [ ] 複雜來源預覽。
-- [ ] 大型資料集的分頁或虛擬列表。
-
-## 4. 開始實作前的驗證順序
-
-1. 選定部署平台，建立最小 Astro + Svelte + TypeScript + Tailwind 專案並確認能建置。
-2. 驗證 IndexedDB 資料保存、重新載入恢復與 schema migration 方向。
-3. 確認一個合法且規則明確的候選來源，完成獨立的轉換器單元測試。
-4. 定稿資料模型，確認目前碼錶狀態與已完成紀錄的區分。
-5. 再建立 Worker 測試環境，驗證密碼、限流、固定 GitHub 路徑、SHA 衝突及失敗復原。
-6. 每個決策確定後同步更新 TECHNICAL_DECISIONS.md、PROJECT_PLAN.md 與 IMPLEMENTATION_ROADMAP.md。
-
-## 5. 文件狀態說明
-
-文件已建立不等於功能已實作。所有規劃中的方案仍需經過技術驗證、測試與實際部署。若實作結果迫使架構改變，應先更新相關規格，再調整路線圖。
+- 同步前端：`src/lib/sync.ts`
+- 同步 UI：`src/components/AppShell.svelte`
+- Worker：`worker/src/index.js`
+- Worker 設定：`worker/wrangler.toml`
+- Worker 部署：`.github/workflows/deploy-worker.yml`
