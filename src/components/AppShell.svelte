@@ -24,6 +24,8 @@
   let favoriteUrl = '';
   let favoriteNotes = '';
   let favoriteQuery = '';
+  let favoriteSort: 'newest' | 'oldest' | 'title' | 'updated' = 'newest';
+  let editingFavoriteId: string | null = null;
   let storageError = '';
   let notice = '';
   let recordQuery = '';
@@ -41,7 +43,12 @@
   $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
   $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
-  $: filteredFavorites = favorites.filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())));
+  $: filteredFavorites = favorites
+    .filter((item) => [item.title, item.url, item.notes ?? ''].some((value) => value.toLocaleLowerCase().includes(favoriteQuery.toLocaleLowerCase())))
+    .sort((a, b) => favoriteSort === 'oldest' ? a.createdAt - b.createdAt
+      : favoriteSort === 'title' ? a.title.localeCompare(b.title, 'zh-TW')
+      : favoriteSort === 'updated' ? b.updatedAt - a.updatedAt
+      : b.createdAt - a.createdAt);
   $: elapsedLabel = formatDuration(elapsedMs);
 
   function makeTitle(timestamp: number): string {
@@ -124,7 +131,7 @@
     }
     const timestamp = Date.now();
     const normalizedUrl = parsedUrl.href;
-    const existing = favorites.find((item) => item.url === normalizedUrl);
+    const existing = favorites.find((item) => item.id === editingFavoriteId) ?? favorites.find((item) => item.url === normalizedUrl);
     const item: FavoriteItem = {
       id: existing?.id ?? crypto.randomUUID(),
       url: normalizedUrl,
@@ -139,10 +146,29 @@
       favoriteTitle = '';
       favoriteUrl = '';
       favoriteNotes = '';
+      editingFavoriteId = null;
       notice = existing ? '已更新這個收藏。' : '已加入收藏。';
     } catch (error) {
       storageError = error instanceof Error ? error.message : '保存收藏失敗。';
     }
+  }
+
+  function editFavorite(item: FavoriteItem) {
+    editingFavoriteId = item.id;
+    favoriteTitle = item.title;
+    favoriteUrl = item.url;
+    favoriteNotes = item.notes ?? '';
+    storageError = '';
+    notice = '';
+    document.querySelector('.favorite-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function cancelFavoriteEdit() {
+    editingFavoriteId = null;
+    favoriteTitle = '';
+    favoriteUrl = '';
+    favoriteNotes = '';
+    storageError = '';
   }
 
   async function removeFavorite(id: string) {
@@ -297,21 +323,21 @@
       {:else}
         <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
-          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>新增收藏</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
+          <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
           <form class="favorite-form" onsubmit={(event) => { event.preventDefault(); void addFavorite(); }}>
             <label>網址 <input bind:value={favoriteUrl} type="url" required placeholder="https://example.com/page" /></label>
             <label>標題 <input bind:value={favoriteTitle} placeholder="留空時使用網站網域" /></label>
             <label>備註 <input bind:value={favoriteNotes} placeholder="選填，例如用途或關鍵字" /></label>
-            <button class="primary-button" type="submit">＋ 儲存收藏</button>
+            <div class="favorite-form-actions"><button class="primary-button" type="submit">{editingFavoriteId ? '儲存變更' : '＋ 儲存收藏'}</button>{#if editingFavoriteId}<button class="secondary-button" type="button" onclick={cancelFavoriteEdit}>取消編輯</button>{/if}</div>
           </form>
         </section>
         <section class="records-section full-records">
-          <label class="search-field"><span>⌕</span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label>
+          <div class="history-toolbar"><label class="search-field"><span>⌕</span><input bind:value={favoriteQuery} placeholder="搜尋標題、網址或備註…" aria-label="搜尋收藏" /></label><label class="sort-field">排序<select bind:value={favoriteSort} aria-label="收藏排序"><option value="newest">最近加入</option><option value="oldest">最早加入</option><option value="updated">最近更新</option><option value="title">標題 A 到 Z</option></select></label></div>
           {#if filteredFavorites.length === 0}
             <div class="record-list empty-state"><div class="empty-icon">☆</div><strong>{favorites.length ? '沒有符合的收藏' : '收藏清單是空的'}</strong><span>{favorites.length ? '試試其他關鍵字。' : '使用上方表單保存常用網址。'}</span></div>
           {:else}
             <div class="favorite-list">{#each filteredFavorites as item (item.id)}
-              <article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>
+              <article class="favorite-row"><div class="record-symbol">↗</div><div class="record-info"><strong>{item.title}</strong><a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>{#if item.notes}<small>{item.notes}</small>{/if}<small>更新於 {new Date(item.updatedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><button class="edit-favorite" aria-label={'編輯 ' + item.title} title="編輯收藏" onclick={() => editFavorite(item)}>✎</button><a class="open-favorite" href={item.url} target="_blank" rel="noopener noreferrer" aria-label={'開啟 ' + item.title} title="在新分頁開啟">↗</a><button class="delete-button" aria-label={'取消收藏 ' + item.title} title="取消收藏" onclick={() => removeFavorite(item.id)}>×</button></article>
             {/each}</div>
           {/if}
         </section>
