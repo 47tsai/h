@@ -126,7 +126,7 @@ describe('atomic backup import', () => {
     expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(false);
   });
 
-  it('rolls back the whole import when any record is invalid', async () => {
+  it('rejects invalid entries before writing any imported records', async () => {
     const valid = sampleRecord({ id: 'should-roll-back' });
     const invalid = { title: 'missing ID' } as unknown as StopwatchRecord;
 
