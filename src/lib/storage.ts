@@ -162,6 +162,22 @@ export async function importBackupData(
   importedHistory: ResultHistoryItem[],
   importedFavorites: FavoriteItem[],
 ): Promise<void> {
+  if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)) {
+    throw new Error('備份資料結構不正確。');
+  }
+  const hasValidId = (item: unknown): item is { id: string } => Boolean(item && typeof item === 'object'
+    && typeof (item as { id?: unknown }).id === 'string' && (item as { id: string }).id.length > 0
+    && (item as { id: string }).id.length <= 200);
+  const hasValidUrl = (item: unknown): item is { id: string; url: string } => hasValidId(item)
+    && typeof (item as { url?: unknown }).url === 'string' && (item as { url: string }).url.length <= 4096;
+  const hasUniqueIds = (items: { id: string }[]) => new Set(items.map((item) => item.id)).size === items.length;
+  const hasUniqueUrls = (items: { url: string }[]) => new Set(items.map((item) => item.url)).size === items.length;
+  if (!importedRecords.every(hasValidId) || !importedHistory.every(hasValidUrl) || !importedFavorites.every(hasValidUrl)
+    || !hasUniqueIds(importedRecords) || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
+    || !hasUniqueUrls(importedHistory) || !hasUniqueUrls(importedFavorites)) {
+    throw new Error('備份包含無效或重複的 ID／網址，未匯入任何內容。');
+  }
+
   const db = await getDatabase();
   const tx = db.transaction(
     ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
