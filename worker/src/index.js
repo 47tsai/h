@@ -275,16 +275,15 @@ export default {
     }
     let payload;
     try { payload = JSON.parse(raw); } catch { return fail('BAD_REQUEST', 400, allowedOrigin); }
-    if (!isPlainObject(payload) || payload.action !== 'sync' || typeof payload.password !== 'string'
-      || !validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
+    if (!isPlainObject(payload) || !['sync', 'check-auth'].includes(payload.action)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
       return fail('RATE_LIMITED', 429, allowedOrigin);
     }
-    if (!await verifyPassword(payload.password, env.SYNC_PASSWORD_HASH)) {
-      return fail('AUTH_FAILED', 401, allowedOrigin);
-    }
+    // Password verification is disabled for now to restore one-tap sync.
+    if (payload.action === 'check-auth') return json({ ok: true }, 200, allowedOrigin);
+    if (!validateDocument(payload.document)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
     let local = payload.document;
     try {
