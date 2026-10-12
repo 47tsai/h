@@ -33,7 +33,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   BAD_REQUEST: '同步資料格式不正確。',
   SYNC_CONFLICT: '雲端資料正在變更，請稍後再同步。',
   GITHUB_RATE_LIMITED: 'GitHub 暫時限制請求，請稍後再試。',
-  GITHUB_PERMISSION_ERROR: '同步服務無法存取私人資料庫，請檢查 Worker 設定。',
+  GITHUB_PERMISSION_ERROR: '同步服務無法存取 GitHub 儲存庫，請檢查 Worker Token 與儲存庫設定。',
   GITHUB_UNAVAILABLE: '目前無法連線 GitHub，請稍後再試。',
   REMOTE_DATA_INVALID: '雲端資料格式有誤，為保護資料已停止同步。',
   SERVER_NOT_CONFIGURED: '同步服務尚未完成設定。',
@@ -43,7 +43,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 function isSafeWorkerUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash;
+    return url.protocol === 'https:' && (url.pathname === '/' || url.pathname === '')
+      && !url.username && !url.password && !url.search && !url.hash;
   } catch {
     return false;
   }
