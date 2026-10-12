@@ -275,8 +275,7 @@ export default {
     }
     let payload;
     try { payload = JSON.parse(raw); } catch { return fail('BAD_REQUEST', 400, allowedOrigin); }
-    if (!isPlainObject(payload) || typeof payload.password !== 'string'
-      || !['sync', 'check-auth'].includes(payload.action)) return fail('BAD_REQUEST', 400, allowedOrigin);
+    if (!isPlainObject(payload) || !['sync', 'check-auth'].includes(payload.action)) return fail('BAD_REQUEST', 400, allowedOrigin);
 
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
     if (env.SYNC_LIMITER && !(await env.SYNC_LIMITER.limit({ key: ip })).success) {
