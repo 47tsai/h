@@ -401,7 +401,7 @@
             <button class="text-button" onclick={() => activeSection = 'settings'}>主題設定 →</button>
           </div>
         </section>
-      
+      {:else}
         <section class="page-heading"><div><div class="eyebrow">SAVED ITEMS</div><h1>我的收藏</h1><p>收藏與碼錶紀錄分開保存，可搜尋、開啟或更新備註。</p></div><span class="count-pill">{favorites.length} 筆</span></section>
         <section class="favorite-editor">
           <div class="editor-heading"><div class="placeholder-icon">☆</div><div><h2>{editingFavoriteId ? '編輯收藏' : '新增收藏'}</h2><p>貼上完整網址即可保存，標題與備註可留空。</p></div></div>
