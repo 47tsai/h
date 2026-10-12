@@ -337,18 +337,18 @@
   let dataBusy = false;
   let syncBusy = false;
   let syncError = '';
+  let syncPassword = '';
   let lastSyncedAt = '';
   const syncWorkerUrl = (import.meta.env.PUBLIC_SYNC_WORKER_URL ?? '').trim();
   const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
 
   async function runCloudSync() {
     if (!syncWorkerUrl || syncBusy) return;
-    const password = window.prompt('請輸入專用的雲端同步密碼。密碼不會儲存在此裝置。');
-    if (password === null) return;
-    if (!password.trim()) {
-      syncError = '請輸入同步密碼。';
+    if (!syncPassword.trim()) {
+      syncError = '請先輸入同步密碼。';
       return;
     }
+    const password = syncPassword;
     syncBusy = true;
     syncError = '';
     notice = '';
@@ -369,6 +369,7 @@
       syncError = error instanceof Error ? error.message : '同步失敗，請稍後再試。';
     } finally {
       syncBusy = false;
+      syncPassword = '';
     }
   }
 
@@ -623,8 +624,10 @@
           <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">{syncWorkerUrl ? (lastSyncedAt ? '已連接' : '待同步') : '未設定'}</span></div>
           {#if syncWorkerUrl}
             <div class="sync-controls">
-              <button class="secondary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy}>{syncBusy ? '同步中…' : '立即同步'}</button>
+              <input type="password" bind:value={syncPassword} autocomplete="current-password" placeholder="輸入同步密碼" aria-label="雲端同步密碼" disabled={syncBusy} />
+              <button class="secondary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy || !syncPassword.trim()}>{syncBusy ? '同步中…' : '立即同步'}</button>
             </div>
+            <p class="sync-last-success">同步密碼只用於本次 HTTPS 請求，不會儲存至本機。</p>
           {:else}
             <div class="setting-row"><div><strong>尚未設定同步服務</strong></div><button class="secondary-button" disabled>立即同步</button></div>
           {/if}
