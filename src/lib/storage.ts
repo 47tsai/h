@@ -162,6 +162,70 @@ export async function deleteFavorite(id: string): Promise<void> {
   await tx.done;
 }
 
+export interface SyncStorageSnapshot {
+  stopwatchRecords: StopwatchRecord[];
+  resultHistory: ResultHistoryItem[];
+  favorites: FavoriteItem[];
+  tombstones: SyncTombstone[];
+}
+
+/**
+ * Replace local syncable data only if the database still matches the snapshot
+ * that was sent to the server. A single readwrite transaction prevents other
+ * IndexedDB writes from slipping between the comparison and replacement.
+ */
+export async function applySyncSnapshotIfUnchanged(
+  expected: SyncStorageSnapshot,
+  next: SyncStorageSnapshot,
+): Promise<boolean> {
+  const db = await getDatabase();
+  const tx = db.transaction(
+    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    'readwrite',
+  );
+  const recordsStore = tx.objectStore('stopwatch-records');
+  const historyStore = tx.objectStore('result-history');
+  const favoritesStore = tx.objectStore('favorites');
+  const tombstonesStore = tx.objectStore('sync-tombstones');
+
+  const [records, history, favorites, tombstones] = await Promise.all([
+    recordsStore.getAll(), historyStore.getAll(), favoritesStore.getAll(), tombstonesStore.getAll(),
+  ]);
+  const stable = (snapshot: SyncStorageSnapshot) => JSON.stringify({
+    stopwatchRecords: [...snapshot.stopwatchRecords].sort((a, b) => a.id.localeCompare(b.id)),
+    resultHistory: [...snapshot.resultHistory].sort((a, b) => a.id.localeCompare(b.id)),
+    favorites: [...snapshot.favorites].sort((a, b) => a.id.localeCompare(b.id)),
+    tombstones: [...snapshot.tombstones].sort((a, b) => a.key.localeCompare(b.key)),
+  });
+  const current: SyncStorageSnapshot = {
+    stopwatchRecords: records,
+    resultHistory: history,
+    favorites,
+    tombstones,
+  };
+
+  if (stable(current) !== stable(expected)) {
+    tx.abort();
+    try { await tx.done; } catch { /* Expected abort because the snapshot changed. */ }
+    return false;
+  }
+
+  await Promise.all([
+    recordsStore.clear(),
+    historyStore.clear(),
+    favoritesStore.clear(),
+    tombstonesStore.clear(),
+  ]);
+  await Promise.all([
+    ...next.stopwatchRecords.map((item) => recordsStore.put(item)),
+    ...next.resultHistory.map((item) => historyStore.put(item)),
+    ...next.favorites.map((item) => favoritesStore.put(item)),
+    ...next.tombstones.map((item) => tombstonesStore.put(item)),
+  ]);
+  await tx.done;
+  return true;
+}
+
 export async function listSyncTombstones(): Promise<SyncTombstone[]> {
   const db = await getDatabase();
   return db.getAll('sync-tombstones');
