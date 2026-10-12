@@ -35,6 +35,7 @@
   let converterSite = 'N';
   let converterOutput = '';
   let converterUrl = '';
+  let converterUrls: string[] = [];
 
   const converterSources: Record<string, { label: string; domain: string; buildUrl?: (id: string) => string }> = {
     N: { label: 'N 站', domain: 'n.com', buildUrl: (id) => `https://n.com/g/${id}` },
@@ -45,19 +46,31 @@
 
   function updateConverterOutput() {
     const id = converterInput.trim();
-    const detectedSite = ({ 5: 'W', 6: 'N', 7: 'JM', 8: 'P' } as Record<number, string>)[id.length];
-    const sourceKey = converterSite === 'AUTO' ? detectedSite : converterSite;
-    const source = sourceKey ? converterSources[sourceKey] : undefined;
-    const validId = Boolean(id && /^[0-9]+$/.test(id) && source);
-    converterUrl = validId && source?.buildUrl ? source.buildUrl(id) : '';
-    converterOutput = validId && source
-      ? converterUrl || `${source.label}（${source.domain}） · 編號 ${id}`
+    const validId = Boolean(id && /^[0-9]+$/.test(id));
+    const detectedSites = converterSite === 'AUTO'
+      ? ({ 5: ['W'], 6: ['N', 'W'], 7: ['JM'], 8: ['P'] } as Record<number, string[]>)[id.length] ?? []
+      : [converterSite];
+    const results = validId
+      ? detectedSites
+          .map((key) => {
+            const source = converterSources[key];
+            if (!source) return '';
+            return source.buildUrl ? source.buildUrl(id) : `${source.label}（${source.domain}） · 編號 ${id}`;
+          })
+          .filter(Boolean)
+      : [];
+    converterUrls = results;
+    converterUrl = validId
+      ? detectedSites.map((key) => converterSources[key]?.buildUrl?.(id)).find(Boolean) ?? ''
       : '';
+    converterOutput = results.join('\\n');
   }
 
   function clearConverter() {
     converterInput = '';
     converterOutput = '';
+    converterUrl = '';
+    converterUrls = [];
     notice = '';
   }
 
@@ -84,8 +97,8 @@
   async function copyConverterOutput() {
     if (!converterOutput) return;
     try {
-      await navigator.clipboard.writeText(converterUrl || converterOutput);
-      notice = converterUrl ? '已複製網址。' : '已複製預覽結果。';
+      await navigator.clipboard.writeText(converterOutput);
+      notice = converterUrls.some((result) => result.startsWith('https://')) ? '已複製轉換結果。' : '已複製預覽結果。';
     } catch {
       notice = '無法存取剪貼簿，請手動複製結果。';
     }
@@ -93,7 +106,7 @@
 
   async function shareConverterOutput() {
     if (!converterOutput) return;
-    const shareText = converterUrl || converterOutput;
+    const shareText = converterOutput;
     try {
       if (navigator.share) await navigator.share({ text: shareText });
       else await navigator.clipboard.writeText(shareText);
@@ -412,7 +425,7 @@
                 <button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}>⤨</button>
               </div>
             </div>
-            <p class="converter-hint">可手動選擇來源，或依編號位數自動識別：5 位 W、6 位 N、7 位 JM、8 位 P。自動識別不限制輸入長度；位數不符合時不會判定來源。</p>
+            <p class="converter-hint">可手動選擇來源，或依編號位數自動識別：5 位 W、6 位 N 與 W、7 位 JM、8 位 P。</p>
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
@@ -426,7 +439,7 @@
             <div class="converter-result-actions">
               <button class="secondary-button" disabled={!converterUrl} onclick={() => { if (converterUrl) window.open(converterUrl, '_blank', 'noopener,noreferrer'); }}>↗ 開啟</button>
             </div>
-            <div class="converter-preview-note"><span>ⓘ</span> N 站已支援依編號產生作品網址；其他來源的網址規則尚待設定。</div>
+            <div class="converter-preview-note"><span>ⓘ</span> N 站已支援依編號產生作品網址；W 站網址規則尚待設定。</div>
           </div>
           <div class="converter-footer-actions">
             <span>H TOOLS <span class="footer-separator">·</span> CONVERTER</span>
@@ -537,7 +550,7 @@
   .converter-icon-button:disabled { opacity:.35; cursor:not-allowed; }
   .converter-hint { margin:10px 2px 0; color:var(--muted); font-size:10px; }
   .converter-output-row { display:flex; align-items:center; gap:12px; min-height:84px; border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--bg); }
-  .converter-output-text { min-width:0; flex:1; text-align:center; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
+  .converter-output-text { min-width:0; flex:1; text-align:center; white-space:pre-line; overflow-wrap:anywhere; font-size:13px; line-height:1.7; }
   .converter-result-actions { display:flex; gap:12px; margin-top:14px; }
   .converter-result-actions button { flex:1; }
   .converter-result-actions button:disabled { opacity:.4; cursor:not-allowed; transform:none; }
