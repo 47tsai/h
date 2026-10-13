@@ -732,7 +732,7 @@
         </section>
       {/if}
 
-      {#if storageError}<div class="toast error" role="alert">{storageError}</div>{/if}
+      {#if storageError}<div class="toast error" role="alert">{storageError}<button aria-label="關閉錯誤訊息" onclick={() => storageError = ''}><Icon name="x" size={16} /></button></div>{/if}
       {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}><Icon name="x" size={16} /></button></div>{/if}
       
     </div>
