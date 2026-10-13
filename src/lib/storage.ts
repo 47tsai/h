@@ -264,10 +264,15 @@ export async function applySyncSnapshotIfUnchanged(
       tombstonesToWrite.set(tombstone.key, tombstone);
     }
   }
+  const safeNext = {
+    stopwatchRecords: next.stopwatchRecords.filter((item) => !tombstonesToWrite.has('stopwatchRecords:' + item.id)),
+    resultHistory: next.resultHistory.filter((item) => !tombstonesToWrite.has('resultHistory:' + item.id)),
+    favorites: next.favorites.filter((item) => !tombstonesToWrite.has('favorites:' + item.id)),
+  };
   const nextIds = {
-    stopwatchRecords: new Set(next.stopwatchRecords.map((item) => item.id)),
-    resultHistory: new Set(next.resultHistory.map((item) => item.id)),
-    favorites: new Set(next.favorites.map((item) => item.id)),
+    stopwatchRecords: new Set(safeNext.stopwatchRecords.map((item) => item.id)),
+    resultHistory: new Set(safeNext.resultHistory.map((item) => item.id)),
+    favorites: new Set(safeNext.favorites.map((item) => item.id)),
   };
   const preserveRemovedId = (entity: SyncEntity, id: string) => {
     if (nextIds[entity].has(id)) return;
@@ -291,9 +296,9 @@ export async function applySyncSnapshotIfUnchanged(
     tombstonesStore.clear(),
   ]);
   await Promise.all([
-    ...next.stopwatchRecords.map((item) => recordsStore.put(item)),
-    ...next.resultHistory.map((item) => historyStore.put(item)),
-    ...next.favorites.map((item) => favoritesStore.put(item)),
+    ...safeNext.stopwatchRecords.map((item) => recordsStore.put(item)),
+    ...safeNext.resultHistory.map((item) => historyStore.put(item)),
+    ...safeNext.favorites.map((item) => favoritesStore.put(item)),
     ...[...tombstonesToWrite.values()].map((item) => tombstonesStore.put(item)),
   ]);
   await tx.done;

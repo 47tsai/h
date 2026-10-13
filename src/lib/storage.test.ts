@@ -165,12 +165,14 @@ describe('atomic sync snapshot application', () => {
     };
     await saveSyncTombstone(tombstone);
 
+    const staleFavorite = sampleFavorite({ id: 'already-deleted' });
     const applied = await applySyncSnapshotIfUnchanged(
       { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [tombstone] },
-      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+      { stopwatchRecords: [], resultHistory: [], favorites: [staleFavorite], tombstones: [] },
     );
 
     expect(applied).toBe(true);
+    expect(await listFavorites()).toEqual([]);
     expect(await listSyncTombstones()).toContainEqual(tombstone);
   });
 
