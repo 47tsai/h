@@ -81,6 +81,52 @@ describe('atomic local data clearing', () => {
 });
 
 describe('atomic sync snapshot application', () => {
+  it('creates tombstones for every local item removed by an accepted cloud snapshot', async () => {
+    const record = sampleRecord({ id: 'removed-record' });
+    const history = {
+      id: 'removed-history',
+      url: 'https://example.com/removed-history',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 200,
+      createdAt: 100,
+    };
+    const favorite = sampleFavorite({
+      id: 'removed-favorite',
+      url: 'https://example.com/removed-favorite',
+    });
+
+    await saveStopwatchRecord(record);
+    await recordResultAction(history);
+    await saveFavorite(favorite);
+
+    const applied = await applySyncSnapshotIfUnchanged(
+      {
+        stopwatchRecords: [record],
+        resultHistory: [history],
+        favorites: [favorite],
+        tombstones: [],
+      },
+      {
+        stopwatchRecords: [],
+        resultHistory: [],
+        favorites: [],
+        tombstones: [],
+      },
+    );
+
+    expect(applied).toBe(true);
+    expect(await listStopwatchRecords()).toEqual([]);
+    expect(await listResultHistory()).toEqual([]);
+    expect(await listFavorites()).toEqual([]);
+    expect((await listSyncTombstones()).map((item) => item.key).sort()).toEqual([
+      'favorites:removed-favorite',
+      'resultHistory:removed-history',
+      'stopwatchRecords:removed-record',
+    ]);
+  });
+
   it('refuses to replace data when the local snapshot has changed', async () => {
     const local = sampleFavorite({ id: 'changed-locally', title: 'Keep this local change' });
     await saveFavorite(local);
