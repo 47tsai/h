@@ -8,9 +8,9 @@ export interface RunningState {
 export function isRunningState(value: unknown): value is RunningState {
   if (!value || typeof value !== 'object') return false;
   const state = value as Partial<RunningState>;
-  return Number.isFinite(state.sessionStartedAt) &&
-    Number.isFinite(state.startedAt) &&
-    Number.isFinite(state.accumulatedMs) &&
+  return Number.isSafeInteger(state.sessionStartedAt) &&
+    Number.isSafeInteger(state.startedAt) &&
+    Number.isSafeInteger(state.accumulatedMs) &&
     typeof state.running === 'boolean' &&
     (state.sessionStartedAt as number) > 0 &&
     (state.startedAt as number) >= (state.sessionStartedAt as number) &&
