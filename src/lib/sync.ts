@@ -87,7 +87,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
     return hasOnlyKeys(item, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
-      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
       && typeof item.title === 'string' && item.title.length <= 500
       && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
       && item.endedAt >= item.startedAt
@@ -97,7 +97,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
     return hasOnlyKeys(item, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
-      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
       && isSafeHttpUrl(item.url)
       && typeof item.source === 'string' && item.source.length <= 200
       && typeof item.sourceLabel === 'string' && item.sourceLabel.length <= 500
@@ -108,7 +108,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
     return hasOnlyKeys(item, ['id', 'source', 'url', 'title', 'notes', 'createdAt', 'updatedAt'])
-      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
       && isSafeHttpUrl(item.url)
       && typeof item.title === 'string' && item.title.length <= 500
       && (item.source === undefined || (typeof item.source === 'string' && item.source.length <= 200))
@@ -120,7 +120,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     const item = value as Record<string, unknown>;
     return hasOnlyKeys(item, ['key', 'entity', 'id', 'deletedAt'])
       && ['stopwatchRecords', 'resultHistory', 'favorites'].includes(String(item.entity))
-      && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+      && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
       && item.key === String(item.entity) + ':' + item.id && isTimestamp(item.deletedAt);
   };
 

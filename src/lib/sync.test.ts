@@ -41,6 +41,17 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(extraTombstoneField)).toBe(false);
   });
 
+  it('rejects blank IDs in records and tombstones', () => {
+    const blankRecordId = validDocument();
+    blankRecordId.stopwatchRecords[0].id = '   ';
+    expect(isValidSyncDocument(blankRecordId)).toBe(false);
+
+    const blankTombstoneId = validDocument();
+    blankTombstoneId.tombstones[0].id = ' ';
+    blankTombstoneId.tombstones[0].key = 'favorites: ';
+    expect(isValidSyncDocument(blankTombstoneId)).toBe(false);
+  });
+
   it('rejects unsafe URLs containing credentials', () => {
     const document = validDocument();
     document.favorites[0].url = 'https://user:password@example.com/item/2';

@@ -56,7 +56,7 @@ function hasOnlyKeys(value, allowed) {
 }
 
 function validItem(entity, value) {
-  if (!isPlainObject(value) || typeof value.id !== 'string' || !value.id || value.id.length > 200) return false;
+  if (!isPlainObject(value) || typeof value.id !== 'string' || !value.id.trim() || value.id.length > 200) return false;
   if (entity === 'stopwatchRecords') {
     return hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
       && typeof value.title === 'string' && value.title.length <= 500
@@ -115,7 +115,7 @@ function validateDocument(doc) {
   if (!doc.tombstones.every((item) => isPlainObject(item)
     && hasOnlyKeys(item, ['key', 'entity', 'id', 'deletedAt'])
     && ALLOWED_ENTITIES.includes(item.entity)
-    && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
+    && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
     && item.key === item.entity + ':' + item.id
     && safeInteger(item.deletedAt))
     || !hasUnique(doc.tombstones, 'key')) return false;
