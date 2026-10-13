@@ -10,20 +10,22 @@ import '../styles/global.css';
     <meta name="theme-color" content="#0b0e14" />
     <script is:inline>
       (() => {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        let savedTheme: string | null = null;
+
         try {
-          const saved = localStorage.getItem('h-tools-theme');
-          const theme = saved === 'light' || saved === 'dark'
-            ? saved
-            : window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.style.colorScheme = theme;
-          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f4f6fb' : '#0b0e14');
+          savedTheme = localStorage.getItem('h-tools-theme');
         } catch {
-          const theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-          document.documentElement.dataset.theme = theme;
-          document.documentElement.style.colorScheme = theme;
-          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f4f6fb' : '#0b0e14');
+          // Storage may be unavailable; use the system preference.
         }
+
+        const theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : systemTheme;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]')?.setAttribute(
+          'content',
+          theme === 'light' ? '#f4f6fb' : '#0b0e14',
+        );
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
