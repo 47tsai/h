@@ -556,7 +556,7 @@
 
   <main class="main-area">
     <header class="topbar">
-      
+      <a class="topbar-brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><strong>H Tools</strong></a>
       <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}><Icon name="settings" size={18} /></button></div>
     </header>
 
