@@ -60,6 +60,25 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(blankTombstoneId)).toBe(false);
   });
 
+  it('rejects IDs longer than the supported limit', () => {
+    const record = validDocument();
+    record.stopwatchRecords[0].id = 'x'.repeat(201);
+    expect(isValidSyncDocument(record)).toBe(false);
+
+    const history = validDocument();
+    history.resultHistory[0].id = 'x'.repeat(201);
+    expect(isValidSyncDocument(history)).toBe(false);
+
+    const favorite = validDocument();
+    favorite.favorites[0].id = 'x'.repeat(201);
+    expect(isValidSyncDocument(favorite)).toBe(false);
+
+    const tombstone = validDocument();
+    tombstone.tombstones[0].id = 'x'.repeat(201);
+    tombstone.tombstones[0].key = 'favorites:' + tombstone.tombstones[0].id;
+    expect(isValidSyncDocument(tombstone)).toBe(false);
+  });
+
   it('rejects unsafe URLs containing credentials', () => {
     const document = validDocument();
     document.favorites[0].url = 'https://user:password@example.com/item/2';

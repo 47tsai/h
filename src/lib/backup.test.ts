@@ -82,6 +82,20 @@ describe('backup validation', () => {
     expect(() => validateBackupData(blankFavorite)).toThrow();
   });
 
+  it('rejects IDs longer than the supported limit', () => {
+    const record = validBackup();
+    record.stopwatchRecords[0].id = 'x'.repeat(201);
+    expect(() => validateBackupData(record)).toThrow();
+
+    const history = validBackup();
+    history.resultHistory[0].id = 'x'.repeat(201);
+    expect(() => validateBackupData(history)).toThrow();
+
+    const favorite = validBackup();
+    favorite.favorites[0].id = 'x'.repeat(201);
+    expect(() => validateBackupData(favorite)).toThrow();
+  });
+
   it('rejects duplicate IDs and unsupported backup versions', () => {
     const duplicate = validBackup();
     duplicate.stopwatchRecords.push({ ...duplicate.stopwatchRecords[0] });

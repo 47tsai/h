@@ -122,6 +122,25 @@ describe('sync Worker request validation', () => {
     expect((await send(blankTombstoneId)).status).toBe(400);
   });
 
+  it('rejects IDs longer than the supported limit', async () => {
+    const record = validDocument();
+    record.stopwatchRecords[0].id = 'x'.repeat(201);
+    expect((await send(record)).status).toBe(400);
+
+    const history = validDocument();
+    history.resultHistory[0].id = 'x'.repeat(201);
+    expect((await send(history)).status).toBe(400);
+
+    const favorite = validDocument();
+    favorite.favorites[0].id = 'x'.repeat(201);
+    expect((await send(favorite)).status).toBe(400);
+
+    const tombstone = validDocument();
+    tombstone.tombstones[0].id = 'x'.repeat(201);
+    tombstone.tombstones[0].key = 'favorites:' + tombstone.tombstones[0].id;
+    expect((await send(tombstone)).status).toBe(400);
+  });
+
   it('rejects unknown fields in sync documents and records', async () => {
     const extraTopLevel = validDocument();
     extraTopLevel.unexpected = true;
