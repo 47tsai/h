@@ -208,6 +208,27 @@ describe('atomic backup import', () => {
     expect(await listStopwatchRecords()).toEqual([]);
   });
 
+  it('rejects whitespace-only IDs in every backup entity before writing', async () => {
+    const blankRecord = sampleRecord({ id: '   ' });
+    const blankHistory = {
+      id: '\t ',
+      url: 'https://example.com/blank-history',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 100,
+    };
+    const blankFavorite = sampleFavorite({ id: ' ' });
+
+    await expect(importBackupData([blankRecord], [], [])).rejects.toThrow();
+    await expect(importBackupData([], [blankHistory], [])).rejects.toThrow();
+    await expect(importBackupData([], [], [blankFavorite])).rejects.toThrow();
+    expect(await listStopwatchRecords()).toEqual([]);
+    expect(await listResultHistory()).toEqual([]);
+    expect(await listFavorites()).toEqual([]);
+  });
+
   it('rejects malformed fields and unsafe URLs before opening a write transaction', async () => {
     const valid = sampleRecord({ id: 'must-not-write' });
     const malformedRecord = sampleRecord({ id: 'bad-duration', durationMs: -1 });

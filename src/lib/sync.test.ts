@@ -41,10 +41,18 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(extraTombstoneField)).toBe(false);
   });
 
-  it('rejects blank IDs in records and tombstones', () => {
+  it('rejects blank IDs in every entity and tombstones', () => {
     const blankRecordId = validDocument();
     blankRecordId.stopwatchRecords[0].id = '   ';
     expect(isValidSyncDocument(blankRecordId)).toBe(false);
+
+    const blankHistoryId = validDocument();
+    blankHistoryId.resultHistory[0].id = '\t ';
+    expect(isValidSyncDocument(blankHistoryId)).toBe(false);
+
+    const blankFavoriteId = validDocument();
+    blankFavoriteId.favorites[0].id = ' ';
+    expect(isValidSyncDocument(blankFavoriteId)).toBe(false);
 
     const blankTombstoneId = validDocument();
     blankTombstoneId.tombstones[0].id = ' ';

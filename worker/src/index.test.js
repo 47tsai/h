@@ -103,10 +103,18 @@ describe('sync Worker request validation', () => {
     expect((await send(reversedTimestamps)).status).toBe(400);
   });
 
-  it('rejects blank IDs in records and tombstones', async () => {
+  it('rejects blank IDs in every entity and tombstones', async () => {
     const blankRecordId = validDocument();
     blankRecordId.stopwatchRecords[0].id = '   ';
     expect((await send(blankRecordId)).status).toBe(400);
+
+    const blankHistoryId = validDocument();
+    blankHistoryId.resultHistory[0].id = '\t ';
+    expect((await send(blankHistoryId)).status).toBe(400);
+
+    const blankFavoriteId = validDocument();
+    blankFavoriteId.favorites[0].id = ' ';
+    expect((await send(blankFavoriteId)).status).toBe(400);
 
     const blankTombstoneId = validDocument();
     blankTombstoneId.tombstones[0].id = ' ';
