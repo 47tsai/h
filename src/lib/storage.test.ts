@@ -3,14 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
 import {
   applySyncSnapshotIfUnchanged,
+  clearAllSyncableData,
   deleteFavorite,
   deleteStopwatchRecord,
   importBackupData,
   listFavorites,
+  listResultHistory,
   listStopwatchRecords,
   listResultHistory,
   listSyncTombstones,
   saveFavorite,
+  recordResultAction,
   saveStopwatchRecord,
   type FavoriteItem,
   type StopwatchRecord,
@@ -50,6 +53,33 @@ async function clearDatabase() {
 
 beforeEach(clearDatabase);
 afterEach(clearDatabase);
+
+describe('atomic local data clearing', () => {
+  it('clears all records together and preserves tombstones for cloud sync', async () => {
+    await saveStopwatchRecord(sampleRecord());
+    await saveFavorite(sampleFavorite());
+    await recordResultAction({
+      id: 'history-1',
+      url: 'https://example.com/history',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open',
+      lastActionAt: 100,
+      createdAt: 100,
+    });
+
+    await clearAllSyncableData();
+
+    expect(await listStopwatchRecords()).toEqual([]);
+    expect(await listResultHistory()).toEqual([]);
+    expect(await listFavorites()).toEqual([]);
+    expect((await listSyncTombstones()).map((item) => item.key).sort()).toEqual([
+      'favorites:favorite-1',
+      'resultHistory:history-1',
+      'stopwatchRecords:record-1',
+    ]);
+  });
+});
 
 describe('atomic sync snapshot application', () => {
   it('refuses to replace data when the local snapshot has changed', async () => {
