@@ -26,6 +26,8 @@ describe('stopwatch time calculations', () => {
     expect(isRunningState({ ...activeState, accumulatedMs: -1 })).toBe(false);
     expect(isRunningState({ ...activeState, startedAt: 500 })).toBe(false);
     expect(isRunningState({ ...activeState, running: 'yes' })).toBe(false);
+    expect(isRunningState({ ...activeState, startedAt: Number.MAX_SAFE_INTEGER + 1 })).toBe(false);
+    expect(isRunningState({ ...activeState, accumulatedMs: 1.5 })).toBe(false);
     expect(isRunningState(null)).toBe(false);
   });
 
