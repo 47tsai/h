@@ -162,6 +162,51 @@ export async function deleteFavorite(id: string): Promise<void> {
   await tx.done;
 }
 
+/**
+ * Clear all local records in one transaction while retaining deletion tombstones
+ * so a later cloud sync can propagate the clear to other devices.
+ */
+export async function clearAllSyncableData(): Promise<void> {
+  const db = await getDatabase();
+  const tx = db.transaction(
+    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    'readwrite',
+  );
+  const recordsStore = tx.objectStore('stopwatch-records');
+  const historyStore = tx.objectStore('result-history');
+  const favoritesStore = tx.objectStore('favorites');
+  const tombstonesStore = tx.objectStore('sync-tombstones');
+  const [records, history, favorites, tombstones] = await Promise.all([
+    recordsStore.getAll(),
+    historyStore.getAll(),
+    favoritesStore.getAll(),
+    tombstonesStore.getAll(),
+  ]);
+  const tombstonesByKey = new Map(tombstones.map((item) => [item.key, item]));
+  const now = Date.now();
+  const addTombstone = (entity: SyncEntity, id: string) => {
+    const key = entity + ':' + id;
+    const existing = tombstonesByKey.get(key);
+    tombstonesByKey.set(key, {
+      key,
+      entity,
+      id,
+      deletedAt: Math.max(now, (existing?.deletedAt ?? 0) + 1),
+    });
+  };
+  for (const item of records) addTombstone('stopwatchRecords', item.id);
+  for (const item of history) addTombstone('resultHistory', item.id);
+  for (const item of favorites) addTombstone('favorites', item.id);
+
+  await Promise.all([
+    recordsStore.clear(),
+    historyStore.clear(),
+    favoritesStore.clear(),
+    ...[...tombstonesByKey.values()].map((item) => tombstonesStore.put(item)),
+  ]);
+  await tx.done;
+}
+
 export interface SyncStorageSnapshot {
   stopwatchRecords: StopwatchRecord[];
   resultHistory: ResultHistoryItem[];
