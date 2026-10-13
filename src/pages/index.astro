@@ -11,7 +11,7 @@ import '../styles/global.css';
     <script is:inline>
       (() => {
         const systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        let savedTheme: string | null = null;
+        let savedTheme = null;
 
         try {
           savedTheme = localStorage.getItem('h-tools-theme');
