@@ -256,6 +256,14 @@ export async function applySyncSnapshotIfUnchanged(
   }
 
   const tombstonesToWrite = new Map(next.tombstones.map((item) => [item.key, item]));
+  // A sync response must never erase or regress a local deletion marker, even
+  // if the remote snapshot is stale or accidentally omits that tombstone.
+  for (const tombstone of tombstones) {
+    const incoming = tombstonesToWrite.get(tombstone.key);
+    if (!incoming || tombstone.deletedAt > incoming.deletedAt) {
+      tombstonesToWrite.set(tombstone.key, tombstone);
+    }
+  }
   const nextIds = {
     stopwatchRecords: new Set(next.stopwatchRecords.map((item) => item.id)),
     resultHistory: new Set(next.resultHistory.map((item) => item.id)),

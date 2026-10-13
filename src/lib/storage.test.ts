@@ -156,6 +156,47 @@ describe('atomic sync snapshot application', () => {
     });
   });
 
+  it('preserves local deletion tombstones omitted by a cloud snapshot', async () => {
+    const tombstone = {
+      key: 'favorites:already-deleted',
+      entity: 'favorites' as const,
+      id: 'already-deleted',
+      deletedAt: 2_000,
+    };
+    await saveSyncTombstone(tombstone);
+
+    const applied = await applySyncSnapshotIfUnchanged(
+      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [tombstone] },
+      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+    );
+
+    expect(applied).toBe(true);
+    expect(await listSyncTombstones()).toContainEqual(tombstone);
+  });
+
+  it('keeps the newer local deletion tombstone when the cloud has an older one', async () => {
+    const localTombstone = {
+      key: 'favorites:deleted-with-newer-marker',
+      entity: 'favorites' as const,
+      id: 'deleted-with-newer-marker',
+      deletedAt: 3_000,
+    };
+    await saveSyncTombstone(localTombstone);
+
+    const applied = await applySyncSnapshotIfUnchanged(
+      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [localTombstone] },
+      {
+        stopwatchRecords: [],
+        resultHistory: [],
+        favorites: [],
+        tombstones: [{ ...localTombstone, deletedAt: 1_000 }],
+      },
+    );
+
+    expect(applied).toBe(true);
+    expect(await listSyncTombstones()).toContainEqual(localTombstone);
+  });
+
   it('refuses to replace data when the local snapshot has changed', async () => {
     const local = sampleFavorite({ id: 'changed-locally', title: 'Keep this local change' });
     await saveFavorite(local);
