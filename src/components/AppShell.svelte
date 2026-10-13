@@ -362,6 +362,7 @@
     const resolved = theme === 'system' ? (light ? 'light' : 'dark') : theme;
     document.documentElement.dataset.theme = resolved;
     document.documentElement.style.colorScheme = resolved;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', resolved === 'light' ? '#f4f6fb' : '#0b0e14');
   }
 
   function applyTheme(value: Theme) {
