@@ -10,7 +10,6 @@ import {
   listFavorites,
   listResultHistory,
   listStopwatchRecords,
-  listResultHistory,
   listSyncTombstones,
   saveFavorite,
   recordResultAction,
