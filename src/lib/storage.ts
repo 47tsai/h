@@ -335,6 +335,7 @@ export async function importBackupData(
   const validRecord = (value: unknown): value is StopwatchRecord => hasValidId(value)
     && typeof value.title === 'string' && value.title.length <= 500
     && isTimestamp(value.startedAt) && isTimestamp(value.endedAt)
+    && value.endedAt >= value.startedAt
     && isTimestamp(value.durationMs) && isTimestamp(value.createdAt);
   const validHistory = (value: unknown): value is ResultHistoryItem => hasValidId(value)
     && isSafeHttpUrl(value.url)
