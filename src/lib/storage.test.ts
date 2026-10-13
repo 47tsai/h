@@ -244,6 +244,49 @@ describe('atomic backup import', () => {
     expect(await listStopwatchRecords()).toEqual([]);
   });
 
+  it('remaps imported IDs that already belong to different URLs', async () => {
+    const existingHistory = {
+      id: 'shared-history-id',
+      url: 'https://example.com/original-history',
+      source: 'example',
+      sourceLabel: 'Original history',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 50,
+    };
+    const existingFavorite = sampleFavorite({
+      id: 'shared-favorite-id',
+      url: 'https://example.com/original-favorite',
+      title: 'Original favorite',
+    });
+    await recordResultAction(existingHistory);
+    await saveFavorite(existingFavorite);
+
+    await importBackupData([], [{
+      ...existingHistory,
+      url: 'https://example.com/imported-history',
+      sourceLabel: 'Imported history',
+      lastAction: 'copy',
+      lastActionAt: 200,
+    }], [{
+      ...existingFavorite,
+      url: 'https://example.com/imported-favorite',
+      title: 'Imported favorite',
+      updatedAt: 200,
+    }]);
+
+    const history = await listResultHistory();
+    const favorites = await listFavorites();
+    expect(history).toHaveLength(2);
+    expect(history.find((item) => item.url === existingHistory.url)).toEqual(existingHistory);
+    expect(history.find((item) => item.url === 'https://example.com/imported-history')?.id)
+      .not.toBe(existingHistory.id);
+    expect(favorites).toHaveLength(2);
+    expect(favorites.find((item) => item.url === existingFavorite.url)).toEqual(existingFavorite);
+    expect(favorites.find((item) => item.url === 'https://example.com/imported-favorite')?.id)
+      .not.toBe(existingFavorite.id);
+  });
+
   it('merges history by URL without violating the unique URL index', async () => {
     const { recordResultAction } = await import('./storage');
     const existing = {
