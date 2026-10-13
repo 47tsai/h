@@ -103,21 +103,36 @@
     if (!converterOutput) return;
     try {
       await navigator.clipboard.writeText(converterOutput);
-      for (const result of converterResults) await logResultAction(result, 'copy');
-      notice = '已複製並記錄轉換結果。';
     } catch {
       notice = '無法存取剪貼簿，請手動複製結果。';
+      return;
+    }
+    try {
+      for (const result of converterResults) await logResultAction(result, 'copy');
+      notice = '已複製並記錄轉換結果。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '無法保存轉換歷史紀錄。';
+      notice = '已複製結果，但無法保存完整歷史紀錄。';
     }
   }
 
   async function shareConverterOutput() {
     if (!converterOutput) return;
     const shareText = converterOutput;
+    const usedNativeShare = typeof navigator.share === 'function';
     try {
-      if (navigator.share) { await navigator.share({ text: shareText }); for (const result of converterResults) await logResultAction(result, 'share'); notice = '已分享並記錄轉換結果。'; }
-      else { await navigator.clipboard.writeText(shareText); for (const result of converterResults) await logResultAction(result, 'copy'); notice = '瀏覽器不支援分享，已複製並記錄轉換結果。'; }
+      if (usedNativeShare) await navigator.share({ text: shareText });
+      else await navigator.clipboard.writeText(shareText);
     } catch {
-      notice = '分享已取消或目前瀏覽器不支援。';
+      notice = usedNativeShare ? '分享已取消或目前瀏覽器不支援。' : '無法存取剪貼簿，請手動複製結果。';
+      return;
+    }
+    try {
+      for (const result of converterResults) await logResultAction(result, usedNativeShare ? 'share' : 'copy');
+      notice = usedNativeShare ? '已分享並記錄轉換結果。' : '瀏覽器不支援分享，已複製並記錄轉換結果。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '無法保存轉換歷史紀錄。';
+      notice = usedNativeShare ? '已分享結果，但無法保存完整歷史紀錄。' : '已複製結果，但無法保存完整歷史紀錄。';
     }
   }
 
@@ -183,14 +198,40 @@
     catch (error) { storageError = error instanceof Error ? error.message : '無法保存歷史紀錄。'; }
   }
   async function copyResult(result: {key:string;label:string;url:string}) {
-    try { await navigator.clipboard.writeText(result.url); await logResultAction(result, 'copy'); notice = '已複製並記錄' + result.label + '網址。'; }
-    catch (error) { notice = error instanceof Error ? error.message : '無法複製或保存紀錄。'; }
+    try {
+      await navigator.clipboard.writeText(result.url);
+    } catch {
+      notice = '無法存取剪貼簿，請確認瀏覽器權限或手動複製網址。';
+      return;
+    }
+    try {
+      await logResultAction(result, 'copy');
+      notice = '已複製並記錄' + result.label + '網址。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '無法保存歷史紀錄。';
+      notice = '已複製網址，但無法保存歷史紀錄。';
+    }
   }
   async function shareResult(result: {key:string;label:string;url:string}) {
+    const usedNativeShare = typeof navigator.share === 'function';
     try {
-      if (navigator.share) { await navigator.share({ text: result.url }); await logResultAction(result, 'share'); notice = '已分享並記錄' + result.label + '網址。'; }
-      else { await navigator.clipboard.writeText(result.url); await logResultAction(result, 'copy'); notice = '瀏覽器不支援分享，已複製並記錄' + result.label + '網址。'; }
-    } catch { notice = '分享已取消或目前瀏覽器不支援。'; }
+      if (usedNativeShare) await navigator.share({ text: result.url });
+      else await navigator.clipboard.writeText(result.url);
+    } catch {
+      notice = usedNativeShare ? '分享已取消或目前瀏覽器不支援。' : '無法存取剪貼簿，請手動複製網址。';
+      return;
+    }
+    try {
+      await logResultAction(result, usedNativeShare ? 'share' : 'copy');
+      notice = usedNativeShare
+        ? '已分享並記錄' + result.label + '網址。'
+        : '瀏覽器不支援分享，已複製並記錄' + result.label + '網址。';
+    } catch (error) {
+      storageError = error instanceof Error ? error.message : '無法保存歷史紀錄。';
+      notice = usedNativeShare
+        ? '已分享網址，但無法保存歷史紀錄。'
+        : '已複製網址，但無法保存歷史紀錄。';
+    }
   }
   async function toggleHistoryFavorite(item: ResultHistoryItem) {
     const existing = favorites.find((favorite) => favorite.url === item.url);
