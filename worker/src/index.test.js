@@ -161,6 +161,26 @@ describe('sync Worker request validation', () => {
     expect((await send(missingSettings)).status).toBe(400);
   });
 
+  it('accepts IDs at the maximum supported length', async () => {
+    const document = validDocument();
+    const maxId = 'x'.repeat(200);
+    document.stopwatchRecords[0].id = maxId;
+    document.resultHistory[0].id = maxId;
+    document.favorites[0].id = maxId;
+    document.tombstones[0].id = maxId;
+    document.tombstones[0].key = 'favorites:' + maxId;
+    mockGitHub(validDocument());
+    const response = await send(document, {
+      GITHUB_OWNER: 'owner', GITHUB_REPO: 'repo', GITHUB_TOKEN: 'token',
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.document.stopwatchRecords.some((item) => item.id === maxId)).toBe(true);
+    expect(body.document.resultHistory.some((item) => item.id === maxId)).toBe(true);
+    expect(body.document.favorites.some((item) => item.id === maxId)).toBe(true);
+    expect(body.document.tombstones.some((item) => item.id === maxId)).toBe(true);
+  });
+
   it('rejects non-JSON requests without trying to sync', async () => {
     const response = await worker.fetch(new Request('https://sync.example.com/api/sync', {
       method: 'POST',

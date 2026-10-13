@@ -85,6 +85,17 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(document)).toBe(false);
   });
 
+  it('accepts IDs at the maximum supported length', () => {
+    const document = validDocument();
+    const maxId = 'x'.repeat(200);
+    document.stopwatchRecords[0].id = maxId;
+    document.resultHistory[0].id = maxId;
+    document.favorites[0].id = maxId;
+    document.tombstones[0].id = maxId;
+    document.tombstones[0].key = 'favorites:' + maxId;
+    expect(isValidSyncDocument(document)).toBe(true);
+  });
+
   it('rejects malformed timestamps and unsupported settings', () => {
     const badTimestamp = validDocument();
     badTimestamp.stopwatchRecords[0].durationMs = -1;

@@ -96,6 +96,15 @@ describe('backup validation', () => {
     expect(() => validateBackupData(favorite)).toThrow();
   });
 
+  it('accepts IDs at the maximum supported length', () => {
+    const backup = validBackup();
+    const maxId = 'x'.repeat(200);
+    backup.stopwatchRecords[0].id = maxId;
+    backup.resultHistory[0].id = maxId;
+    backup.favorites[0].id = maxId;
+    expect(() => validateBackupData(backup)).not.toThrow();
+  });
+
   it('rejects duplicate IDs and unsupported backup versions', () => {
     const duplicate = validBackup();
     duplicate.stopwatchRecords.push({ ...duplicate.stopwatchRecords[0] });
