@@ -321,6 +321,8 @@ export async function importBackupData(
     Boolean(item && typeof item === 'object' && !Array.isArray(item));
   const hasValidId = (item: unknown): item is Record<string, unknown> =>
     isObject(item) && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200;
+  const hasOnlyKeys = (item: Record<string, unknown>, allowed: string[]) =>
+    Object.keys(item).every((key) => allowed.includes(key));
   const isTimestamp = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) >= 0;
   const isSafeHttpUrl = (value: unknown): value is string => {
     if (typeof value !== 'string' || value.length > 4096) return false;
@@ -333,17 +335,20 @@ export async function importBackupData(
     }
   };
   const validRecord = (value: unknown): value is StopwatchRecord => hasValidId(value)
+    && hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
     && typeof value.title === 'string' && value.title.length <= 500
     && isTimestamp(value.startedAt) && isTimestamp(value.endedAt)
     && value.endedAt >= value.startedAt
     && isTimestamp(value.durationMs) && isTimestamp(value.createdAt);
   const validHistory = (value: unknown): value is ResultHistoryItem => hasValidId(value)
+    && hasOnlyKeys(value, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
     && isSafeHttpUrl(value.url)
     && typeof value.source === 'string' && value.source.length <= 200
     && typeof value.sourceLabel === 'string' && value.sourceLabel.length <= 500
     && ['open', 'copy', 'share'].includes(String(value.lastAction))
     && isTimestamp(value.lastActionAt) && isTimestamp(value.createdAt);
   const validFavorite = (value: unknown): value is FavoriteItem => hasValidId(value)
+    && hasOnlyKeys(value, ['id', 'source', 'url', 'title', 'notes', 'createdAt', 'updatedAt'])
     && isSafeHttpUrl(value.url)
     && typeof value.title === 'string' && value.title.length <= 500
     && (value.source === undefined || (typeof value.source === 'string' && value.source.length <= 200))
