@@ -7,6 +7,7 @@ import '../styles/global.css';
 <html lang="zh-Hant">
   <head>
     <meta charset="UTF-8" />
+    <meta name="theme-color" content="#0b0e14" />
     <script is:inline>
       (() => {
         try {
@@ -16,15 +17,16 @@ import '../styles/global.css';
             : window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f4f6fb' : '#0b0e14');
         } catch {
           const theme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
           document.documentElement.dataset.theme = theme;
           document.documentElement.style.colorScheme = theme;
+          document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f4f6fb' : '#0b0e14');
         }
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#101521" />
     <meta name="description" content="個人使用的多網站編號轉換、紀錄與時間工具。" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>H Tools</title>
