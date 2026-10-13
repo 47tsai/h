@@ -90,6 +90,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
       && typeof item.id === 'string' && item.id.length > 0 && item.id.length <= 200
       && typeof item.title === 'string' && item.title.length <= 500
       && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
+      && item.endedAt >= item.startedAt
       && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
   };
   const validHistoryItem = (value: unknown): value is ResultHistoryItem => {
