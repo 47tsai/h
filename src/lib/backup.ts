@@ -62,6 +62,7 @@ export function validateBackupData(value: unknown): BackupData {
     && hasOnlyKeys(item, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
     && isId(item.id) && typeof item.title === 'string' && item.title.length <= 500
     && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
+    && item.endedAt >= item.startedAt
     && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
 
   const validHistory = (item: unknown): item is ResultHistoryItem => isObject(item)
