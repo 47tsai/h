@@ -61,6 +61,7 @@ function validItem(entity, value) {
     return hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
       && typeof value.title === 'string' && value.title.length <= 500
       && safeInteger(value.startedAt) && safeInteger(value.endedAt)
+      && value.endedAt >= value.startedAt
       && safeInteger(value.durationMs) && safeInteger(value.createdAt);
   }
   if (entity === 'resultHistory') {
