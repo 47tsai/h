@@ -544,9 +544,18 @@
       if (storedTheme === 'dark' || storedTheme === 'light' || storedTheme === 'system') theme = storedTheme;
       const active = localStorage.getItem('h-tools-stopwatch-active');
       if (active) {
-        const parsed = JSON.parse(active) as RunningState;
-        if (isRunningState(parsed)) runningState = parsed;
-        else localStorage.removeItem('h-tools-stopwatch-active');
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(active);
+        } catch {
+          parsed = null;
+        }
+        if (isRunningState(parsed)) {
+          runningState = parsed;
+        } else {
+          localStorage.removeItem('h-tools-stopwatch-active');
+          storageError = '已清除無效的碼錶暫存狀態，其他紀錄不受影響。';
+        }
       }
     } catch {
       storageError = '讀取本機設定失敗，部分狀態可能已重設。';
