@@ -206,6 +206,10 @@ describe('atomic backup import', () => {
     await expect(importBackupData([valid, malformedRecord], [], [])).rejects.toThrow();
     expect(await listStopwatchRecords()).toEqual([]);
 
+    const reversedTimestamps = sampleRecord({ id: 'reversed', startedAt: 7_000, endedAt: 6_000 });
+    await expect(importBackupData([valid, reversedTimestamps], [], [])).rejects.toThrow();
+    expect(await listStopwatchRecords()).toEqual([]);
+
     const unsafeFavorite = sampleFavorite({ url: 'javascript:alert(1)' });
     await expect(importBackupData([valid], [], [unsafeFavorite])).rejects.toThrow();
     expect(await listStopwatchRecords()).toEqual([]);
