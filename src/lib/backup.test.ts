@@ -68,6 +68,20 @@ describe('backup validation', () => {
     expect(() => validateBackupData(badSettings)).toThrow();
   });
 
+  it('rejects whitespace-only IDs in every backup entity', () => {
+    const blankRecord = validBackup();
+    blankRecord.stopwatchRecords[0].id = '   ';
+    expect(() => validateBackupData(blankRecord)).toThrow();
+
+    const blankHistory = validBackup();
+    blankHistory.resultHistory[0].id = '\t ';
+    expect(() => validateBackupData(blankHistory)).toThrow();
+
+    const blankFavorite = validBackup();
+    blankFavorite.favorites[0].id = ' ';
+    expect(() => validateBackupData(blankFavorite)).toThrow();
+  });
+
   it('rejects duplicate IDs and unsupported backup versions', () => {
     const duplicate = validBackup();
     duplicate.stopwatchRecords.push({ ...duplicate.stopwatchRecords[0] });
