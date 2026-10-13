@@ -643,9 +643,11 @@
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
-            {#if converterResults.length > 1}
-              <div class="converter-bulk-actions"><span>{converterResults.length} 個結果</span><button class="secondary-button" onclick={copyConverterOutput}><Icon name="copy" size={15} /> 複製全部網址</button></div>
-              <div class="converter-multi-results">
+            {#if converterResults.length > 0}
+              {#if converterResults.length > 1}
+                <div class="converter-bulk-actions"><span>{converterResults.length} 個結果</span><button class="secondary-button" onclick={copyConverterOutput}><Icon name="copy" size={15} /> 複製全部網址</button></div>
+              {/if}
+              <div class="converter-multi-results" class:single={converterResults.length === 1}>
                 {#each converterResults as result (result.key)}
                   <div class="converter-multi-result">
                     <div class="converter-multi-heading">{result.label}</div>
@@ -660,14 +662,7 @@
               </div>
             {:else}
               <div class="converter-output-row">
-                <div class="converter-output-text" aria-live="polite">{converterOutput || '轉換結果'}</div>
-                <div class="converter-output-actions">
-                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="複製結果" title="複製結果" onclick={copyConverterOutput}><Icon name="copy" size={18} /></button>
-                  <button class="converter-icon-button" disabled={!converterOutput} aria-label="分享結果" title="分享結果" onclick={shareConverterOutput}><Icon name="share" size={18} /></button>
-                </div>
-              </div>
-              <div class="converter-result-actions">
-                <button class="secondary-button" disabled={!converterUrl} onclick={() => { const result = converterResults[0]; if (result) void openResult(result); }}><Icon name="external-link" size={15} /> 開啟</button>
+                <div class="converter-output-text" aria-live="polite">轉換結果</div>
               </div>
             {/if}
           </div>
