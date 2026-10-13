@@ -37,6 +37,11 @@ describe('backup validation', () => {
     const backup = validBackup();
     backup.stopwatchRecords[0].durationMs = -1;
     expect(() => validateBackupData(backup)).toThrow();
+
+    const reversedTimestamps = validBackup();
+    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
+    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
+    expect(() => validateBackupData(reversedTimestamps)).toThrow();
   });
 
   it('rejects unsafe URLs and duplicate history or favorite URLs', () => {
