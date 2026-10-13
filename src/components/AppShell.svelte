@@ -11,6 +11,7 @@
     deleteFavorite,
     deleteResultHistory,
     deleteStopwatchRecord,
+    clearAllSyncableData,
     importBackupData,
     listFavorites,
     listResultHistory,
@@ -518,13 +519,8 @@
     dataBusy = true;
     storageError = '';
     try {
-      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
-        listStopwatchRecords(), listResultHistory(), listFavorites(),
-      ]);
-      for (const item of savedRecords) await deleteStopwatchRecord(item.id);
-      for (const item of savedHistory) await deleteResultHistory(item.id);
-      for (const item of savedFavorites) await deleteFavorite(item.id);
-      try { localStorage.removeItem('h-tools-stopwatch-active'); } catch { /* Other data was still deleted. */ }
+      await clearAllSyncableData();
+      try { localStorage.removeItem('h-tools-stopwatch-active'); } catch { /* IndexedDB data was still deleted. */ }
       runningState = null;
       stopStopwatchTick();
       records = [];
