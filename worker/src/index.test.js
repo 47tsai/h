@@ -167,6 +167,8 @@ describe('sync Worker request validation', () => {
     document.stopwatchRecords[0].id = maxId;
     document.resultHistory[0].id = maxId;
     document.favorites[0].id = maxId;
+    document.resultHistory[0].url = 'https://example.com/max-history';
+    document.favorites[0].url = 'https://example.com/max-favorite';
     document.tombstones[0].id = 'y'.repeat(200);
     document.tombstones[0].key = 'favorites:' + document.tombstones[0].id;
     mockGitHub(validDocument());
