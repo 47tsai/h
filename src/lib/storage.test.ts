@@ -12,6 +12,7 @@ import {
   listStopwatchRecords,
   listSyncTombstones,
   saveFavorite,
+  saveSyncTombstone,
   recordResultAction,
   saveStopwatchRecord,
   type FavoriteItem,
@@ -125,6 +126,34 @@ describe('atomic sync snapshot application', () => {
       'resultHistory:removed-history',
       'stopwatchRecords:removed-record',
     ]);
+  });
+
+  it('refuses a cloud snapshot when a deletion tombstone changes during sync', async () => {
+    await saveSyncTombstone({
+      key: 'favorites:deleted-during-sync',
+      entity: 'favorites',
+      id: 'deleted-during-sync',
+      deletedAt: 1_000,
+    });
+
+    const applied = await applySyncSnapshotIfUnchanged(
+      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+      {
+        stopwatchRecords: [],
+        resultHistory: [],
+        favorites: [sampleFavorite({ id: 'deleted-during-sync' })],
+        tombstones: [],
+      },
+    );
+
+    expect(applied).toBe(false);
+    expect(await listFavorites()).toEqual([]);
+    expect(await listSyncTombstones()).toContainEqual({
+      key: 'favorites:deleted-during-sync',
+      entity: 'favorites',
+      id: 'deleted-during-sync',
+      deletedAt: 1_000,
+    });
   });
 
   it('refuses to replace data when the local snapshot has changed', async () => {
