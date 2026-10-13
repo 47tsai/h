@@ -200,6 +200,14 @@ describe('atomic backup import', () => {
     expect(await listStopwatchRecords()).toEqual([]);
   });
 
+  it('rejects unknown fields during direct backup import', async () => {
+    const valid = sampleRecord({ id: 'must-not-write' });
+    const unknownField = { ...sampleRecord({ id: 'unknown-field' }), injected: true } as unknown as StopwatchRecord;
+
+    await expect(importBackupData([valid, unknownField], [], [])).rejects.toThrow();
+    expect(await listStopwatchRecords()).toEqual([]);
+  });
+
   it('rejects malformed fields and unsafe URLs before opening a write transaction', async () => {
     const valid = sampleRecord({ id: 'must-not-write' });
     const malformedRecord = sampleRecord({ id: 'bad-duration', durationMs: -1 });
