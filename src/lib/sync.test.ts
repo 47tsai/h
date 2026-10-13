@@ -52,6 +52,11 @@ describe('cloud sync document validation', () => {
     badTimestamp.stopwatchRecords[0].durationMs = -1;
     expect(isValidSyncDocument(badTimestamp)).toBe(false);
 
+    const reversedTimestamps = validDocument();
+    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
+    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
+    expect(isValidSyncDocument(reversedTimestamps)).toBe(false);
+
     const badSettings = validDocument();
     Object.assign(badSettings.settings, { token: 'unexpected' });
     expect(isValidSyncDocument(badSettings)).toBe(false);
