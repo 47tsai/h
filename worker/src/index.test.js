@@ -96,6 +96,13 @@ describe('sync Worker request validation', () => {
     expect((await send(favoriteConflict)).status).toBe(400);
   });
 
+  it('rejects stopwatch records whose end time precedes their start time', async () => {
+    const reversedTimestamps = validDocument();
+    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
+    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
+    expect((await send(reversedTimestamps)).status).toBe(400);
+  });
+
   it('rejects unknown fields in sync documents and records', async () => {
     const extraTopLevel = validDocument();
     extraTopLevel.unexpected = true;
