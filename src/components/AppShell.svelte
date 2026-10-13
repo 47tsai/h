@@ -600,7 +600,6 @@
         <section class="settings-card settings-sync-card">
           <div class="settings-section-heading"><h2>雲端同步</h2><span class="setting-badge muted">{syncWorkerUrl ? (lastSyncedAt ? '已連接' : '待同步') : '未設定'}</span></div>
           {#if syncWorkerUrl}
-            <p class="sync-privacy-warning" role="note">隱私提醒：目前同步檔案位於公開 GitHub 儲存庫，任何人都可能讀取。請勿同步密碼、私人資訊或不希望公開的收藏與歷史紀錄。</p>
             <div class="sync-controls">
               <button class="primary-button" type="button" onclick={() => void runCloudSync()} disabled={syncBusy}>{syncBusy ? '同步中…' : '立即同步'}</button>
             </div>
