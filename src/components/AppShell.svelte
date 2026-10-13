@@ -128,7 +128,7 @@
       : recordSort === 'longest' ? b.durationMs - a.durationMs
       : recordSort === 'shortest' ? a.durationMs - b.durationMs
       : b.endedAt - a.endedAt);
-  $: todayKey = localDateKey(Date.now());
+  $: todayKey = localDateKey(now);
   $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
   $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
   $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
@@ -518,6 +518,10 @@
     updateTheme();
     const media = window.matchMedia('(prefers-color-scheme: light)');
     const onThemeChange = () => { if (theme === 'system') updateTheme(); };
+    const refreshCalendarDate = () => { now = Date.now(); };
+    const calendarTick = window.setInterval(refreshCalendarDate, 60_000);
+    window.addEventListener('focus', refreshCalendarDate);
+    document.addEventListener('visibilitychange', refreshCalendarDate);
     media.addEventListener('change', onThemeChange);
     if (runningState?.running) startStopwatchTick();
     listStopwatchRecords().then((value) => { records = value; })
@@ -528,6 +532,9 @@
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取歷史紀錄失敗。'; });
     return () => {
       if (tick) clearInterval(tick);
+      clearInterval(calendarTick);
+      window.removeEventListener('focus', refreshCalendarDate);
+      document.removeEventListener('visibilitychange', refreshCalendarDate);
       media.removeEventListener('change', onThemeChange);
     };
   });
