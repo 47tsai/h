@@ -167,8 +167,8 @@ describe('sync Worker request validation', () => {
     document.stopwatchRecords[0].id = maxId;
     document.resultHistory[0].id = maxId;
     document.favorites[0].id = maxId;
-    document.tombstones[0].id = maxId;
-    document.tombstones[0].key = 'favorites:' + maxId;
+    document.tombstones[0].id = 'y'.repeat(200);
+    document.tombstones[0].key = 'favorites:' + document.tombstones[0].id;
     mockGitHub(validDocument());
     const response = await send(document, {
       GITHUB_OWNER: 'owner', GITHUB_REPO: 'repo', GITHUB_TOKEN: 'token',
@@ -178,7 +178,7 @@ describe('sync Worker request validation', () => {
     expect(body.document.stopwatchRecords.some((item) => item.id === maxId)).toBe(true);
     expect(body.document.resultHistory.some((item) => item.id === maxId)).toBe(true);
     expect(body.document.favorites.some((item) => item.id === maxId)).toBe(true);
-    expect(body.document.tombstones.some((item) => item.id === maxId)).toBe(true);
+    expect(body.document.tombstones.some((item) => item.id === 'y'.repeat(200))).toBe(true);
   });
 
   it('rejects non-JSON requests without trying to sync', async () => {

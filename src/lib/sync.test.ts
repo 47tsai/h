@@ -91,8 +91,8 @@ describe('cloud sync document validation', () => {
     document.stopwatchRecords[0].id = maxId;
     document.resultHistory[0].id = maxId;
     document.favorites[0].id = maxId;
-    document.tombstones[0].id = maxId;
-    document.tombstones[0].key = 'favorites:' + maxId;
+    document.tombstones[0].id = 'y'.repeat(200);
+    document.tombstones[0].key = 'favorites:' + document.tombstones[0].id;
     expect(isValidSyncDocument(document)).toBe(true);
   });
 
