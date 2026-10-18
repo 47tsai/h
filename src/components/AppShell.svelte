@@ -592,7 +592,7 @@
 
 <div class="app-frame">
   <aside class="sidebar">
-    <a class="brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><span><strong>H Tools</strong></span></a>
+    <a class="brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark"><img class="brand-logo-light" src="https://raw.githubusercontent.com/tsai97216/chi-design-system/main/logo/blue-b.png" alt=""><img class="brand-logo-dark" src="https://raw.githubusercontent.com/tsai97216/chi-design-system/main/logo/blue-w.png" alt=""></span><span><strong>H Tools</strong></span></a>
     
     <nav aria-label="主要導覽">
       {#each navigation as item}
@@ -610,7 +610,7 @@
 
   <main class="main-area">
     <header class="topbar">
-      <a class="topbar-brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark">H</span><strong>H Tools</strong></a>
+      <a class="topbar-brand" href="/" aria-label="H Tools 首頁"><span class="brand-mark"><img class="brand-logo-light" src="https://raw.githubusercontent.com/tsai97216/chi-design-system/main/logo/blue-b.png" alt=""><img class="brand-logo-dark" src="https://raw.githubusercontent.com/tsai97216/chi-design-system/main/logo/blue-w.png" alt=""></span><strong>H Tools</strong></a>
       <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}><Icon name="settings" size={18} /></button></div>
     </header>
 
