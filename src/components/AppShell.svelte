@@ -753,7 +753,12 @@
   :global(:root[data-theme="light"]) .app-frame { --bg:#f4f6fb; --panel:#fff; --panel-2:#f8f9fd; --line:#e1e6f0; --text:#172033; --muted:#68758c; --accent:#405fdb; --accent-strong:#3452cb; }
   .sidebar { width:244px; flex:0 0 244px; border-right:1px solid var(--line); padding:27px 15px 18px; display:flex; flex-direction:column; background:var(--bg); }
   .brand { display:flex; align-items:center; gap:12px; text-decoration:none; color:var(--text); padding:0 10px 35px; }
-  .brand-mark { width:38px; height:38px; flex:0 0 38px; border-radius:12px; display:grid; place-items:center; font-weight:800; font-size:20px; line-height:1; color:#0b1020; background:linear-gradient(145deg,#c2ceff,#738cff); }
+  .brand-mark { width:38px; height:38px; flex:0 0 38px; border-radius:0; display:grid; place-items:center; overflow:hidden; background:transparent; }
+  .brand-mark img { display:block; width:100%; height:100%; object-fit:contain; }
+  .brand-logo-light { display:block; }
+  .brand-logo-dark { display:none; }
+  :global([data-theme="dark"]) .brand-logo-light { display:none; }
+  :global([data-theme="dark"]) .brand-logo-dark { display:block; }
   .brand strong { display:block; font-size:15px; letter-spacing:.02em; }.brand small { display:block; color:var(--muted); font-size:8px; letter-spacing:.15em; margin-top:4px; }
   .topbar-brand { display:flex; align-items:center; gap:10px; min-width:0; text-decoration:none; color:var(--text); line-height:1; }
   .topbar-brand strong { display:block; margin:0; font-size:15px; line-height:1.2; font-weight:700; letter-spacing:.02em; }
