@@ -13,8 +13,8 @@
 - 同步文件使用 schema version 1；欄位與合併規則見 `DATA_MODEL_AND_MERGE.md`。
 - Worker 使用 GitHub 檔案 SHA 處理寫入衝突，最多重試三次。
 - 最新提交 `9bb75c4` 的 CI 與 GitHub Pages 部署均成功：
-  - [CI](https://github.com/tsai97216/h/actions/runs/38344017659)
-  - [GitHub Pages 部署](https://github.com/tsai97216/h/actions/runs/38344017638)
+  - [CI](https://github.com/47tsai/h/actions/runs/38344017659)
+  - [GitHub Pages 部署](https://github.com/47tsai/h/actions/runs/38344017638)
 
 ## 同步測試覆蓋與未驗證項目
 
