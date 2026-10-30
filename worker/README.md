@@ -16,7 +16,7 @@ The GitHub token should have only the repository Contents permissions needed to 
 
 The Worker configuration is in `wrangler.toml`. It currently targets:
 
-- Repository: `tsai97216/h`
+- Repository: `47tsai/h`
 - Branch: `main`
 - File: `data/sync.json`
 - Allowed browser origin: `https://h.chi.qzz.io`
