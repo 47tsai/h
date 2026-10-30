@@ -11,8 +11,8 @@
 | 網站主要功能與本機資料保存 | 已實作 | 目前程式碼與既有測試 |
 | 備份匯入／匯出驗證 | 已實作並有測試 | CI |
 | 手動雲端同步與合併 | 已實作並有自動化測試 | 前端與 Worker 測試 |
-| 最新提交自動測試 | 通過 | [CI run](https://github.com/tsai97216/h/actions/runs/38344017659) |
-| 最新提交 GitHub Pages 部署 | 成功 | [部署 run](https://github.com/tsai97216/h/actions/runs/38344017638) |
+| 最新提交自動測試 | 通過 | [CI run](https://github.com/47tsai/h/actions/runs/38344017659) |
+| 最新提交 GitHub Pages 部署 | 成功 | [部署 run](https://github.com/47tsai/h/actions/runs/38344017638) |
 | 真實雙裝置端到端驗收 | 尚未完成 | 尚無實際雙裝置驗收紀錄 |
 | 同步資料私密性與使用者身分驗證 | 尚未解決 | 同步檔案在公開儲存庫，Worker 沒有真正的身分驗證 |
 
