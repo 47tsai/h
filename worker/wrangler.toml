@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2026-10-12"
 
 [vars]
-GITHUB_OWNER = "tsai97216"
+GITHUB_OWNER = "47tsai"
 GITHUB_REPO = "h"
 GITHUB_BRANCH = "main"
 GITHUB_FILE_PATH = "data/sync.json"
