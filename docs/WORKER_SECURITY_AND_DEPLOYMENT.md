@@ -11,7 +11,7 @@
 
 `worker/wrangler.toml` 目前設定：
 
-- `GITHUB_OWNER`：`tsai97216`
+- `GITHUB_OWNER`：`47tsai`
 - `GITHUB_REPO`：`h`
 - `GITHUB_BRANCH`：`main`
 - `GITHUB_FILE_PATH`：`data/sync.json`
@@ -44,7 +44,7 @@ GitHub Actions 部署 Secrets：
 
 目前已移除同步密碼。Worker 以 Origin 比對及限流作為基本限制，但 Origin 不是身分驗證，因為直接呼叫 API 的客戶端可以自行設定該標頭。
 
-同步資料目前存放於公開儲存庫 `tsai97216/h`，所以 `data/sync.json` 是公開內容。請勿將密碼、Token 或其他敏感資料放進同步文件。GitHub Token 只應存在 Worker Secret，不可放進前端。
+同步資料目前存放於公開儲存庫 `47tsai/h`，所以 `data/sync.json` 是公開內容。請勿將密碼、Token 或其他敏感資料放進同步文件。GitHub Token 只應存在 Worker Secret，不可放進前端。
 
 如果需要真正的私密同步，必須先將同步資料移至私人儲存庫，再加入可實際驗證使用者的授權機制。單靠 CORS、Origin 檢查或限流無法達成私密存取。
 
