@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-14T07:43:24.424Z",
+  "updatedAt": "2026-11-16T16:53:44.243Z",
   "settings": {
     "theme": "system"
   },
@@ -147,6 +147,15 @@
       "lastAction": "open",
       "lastActionAt": 1791811556167,
       "createdAt": 1791811556167
+    },
+    {
+      "id": "1fa497af-ab4e-4e98-b721-db75efe634c5",
+      "url": "https://missav.ws/dandy-368",
+      "source": "M",
+      "sourceLabel": "missav",
+      "lastAction": "open",
+      "lastActionAt": 1794848007605,
+      "createdAt": 1794848007605
     }
   ],
   "favorites": [
