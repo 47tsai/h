@@ -4,35 +4,37 @@ import '../styles/global.css';
 ---
 
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-chi-theme="light" data-chi-brand="h">
   <head>
     <meta charset="UTF-8" />
-    <meta name="theme-color" content="#0b0e14" />
+    <!-- chi-system v1.2.0（釘版 a7f018b7836afe42103b717b5379f72a244dfded）：主題邏輯唯一來源是
+      public/chi-system/theme.js，同步引入、放在樣式表之前，首次繪製前套用主題；本站不再自寫
+      主題邏輯，主題 key 為 chi-theme-mode（三態 system/light/dark，預設跟隨系統）。
+      舊 key h-tools-theme 不搬移，遷移後第一次開啟為 system。 -->
+    <script is:inline src="/chi-system/theme.js"></script>
+    <link rel="stylesheet" href="/chi-system/tokens.css" />
+    <meta name="theme-color" content="#F7F8FA" />
     <script is:inline>
+      // 只做一件事：讓瀏覽器 chrome 的 theme-color 跟著 chi 生效主題走（--chi-color-canvas）。
+      // 主題本身由 theme.js 決定，這裡不寫任何主題邏輯。
       (() => {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-        let savedTheme = null;
-
-        try {
-          savedTheme = localStorage.getItem('h-tools-theme');
-        } catch {
-          // Storage may be unavailable; use the system preference.
-        }
-
-        const theme = savedTheme === 'light' || savedTheme === 'dark' ? savedTheme : systemTheme;
-        document.documentElement.dataset.theme = theme;
-        document.documentElement.style.colorScheme = theme;
-        document.querySelector('meta[name="theme-color"]')?.setAttribute(
-          'content',
-          theme === 'light' ? '#f4f6fb' : '#0b0e14',
-        );
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (!meta) return;
+        const sync = () => {
+          const canvas = getComputedStyle(document.documentElement)
+            .getPropertyValue('--chi-color-canvas')
+            .trim();
+          if (canvas) meta.setAttribute('content', canvas);
+        };
+        sync();
+        window.addEventListener('chi-theme-change', sync);
       })();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="個人使用的多網站編號轉換、紀錄與時間工具。" />
-    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/47tsai/chi-design-system/main/logo/blue-w.png" />
-    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/47tsai/chi-design-system/main/logo/blue-w.png" />
-    <title>H Tools</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-w.png" />
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-w.png" />
+    <title>Chi Tools</title>
   </head>
   <body><AppShell client:load /></body>
 </html>
