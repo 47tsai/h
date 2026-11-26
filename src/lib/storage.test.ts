@@ -5,29 +5,15 @@ import {
   applySyncSnapshotIfUnchanged,
   clearAllSyncableData,
   deleteFavorite,
-  deleteStopwatchRecord,
   importBackupData,
   listFavorites,
   listResultHistory,
-  listStopwatchRecords,
   listSyncTombstones,
   saveFavorite,
   saveSyncTombstone,
   recordResultAction,
-  saveStopwatchRecord,
   type FavoriteItem,
-  type StopwatchRecord,
 } from './storage';
-
-const sampleRecord = (overrides: Partial<StopwatchRecord> = {}): StopwatchRecord => ({
-  id: 'record-1',
-  startedAt: 1_000,
-  endedAt: 6_000,
-  durationMs: 5_000,
-  title: '2026/10/12 10:00:00',
-  createdAt: 6_000,
-  ...overrides,
-});
 
 const sampleFavorite = (overrides: Partial<FavoriteItem> = {}): FavoriteItem => ({
   id: 'favorite-1',
@@ -40,10 +26,9 @@ const sampleFavorite = (overrides: Partial<FavoriteItem> = {}): FavoriteItem => 
 
 async function clearDatabase() {
   // Let the production storage module create and migrate the current schema before cleanup.
-  await listStopwatchRecords();
-  const db = await openDB('h-tools', 4);
+  await listFavorites();
+  const db = await openDB('h-tools', 5);
   await Promise.all([
-    db.clear('stopwatch-records'),
     db.clear('favorites'),
     db.clear('result-history'),
     db.clear('sync-tombstones'),
@@ -56,7 +41,6 @@ afterEach(clearDatabase);
 
 describe('atomic local data clearing', () => {
   it('clears all records together and preserves tombstones for cloud sync', async () => {
-    await saveStopwatchRecord(sampleRecord());
     await saveFavorite(sampleFavorite());
     await recordResultAction({
       id: 'history-1',
@@ -70,20 +54,17 @@ describe('atomic local data clearing', () => {
 
     await clearAllSyncableData();
 
-    expect(await listStopwatchRecords()).toEqual([]);
     expect(await listResultHistory()).toEqual([]);
     expect(await listFavorites()).toEqual([]);
     expect((await listSyncTombstones()).map((item) => item.key).sort()).toEqual([
       'favorites:favorite-1',
       'resultHistory:history-1',
-      'stopwatchRecords:record-1',
     ]);
   });
 });
 
 describe('atomic sync snapshot application', () => {
   it('creates tombstones for every local item removed by an accepted cloud snapshot', async () => {
-    const record = sampleRecord({ id: 'removed-record' });
     const history = {
       id: 'removed-history',
       url: 'https://example.com/removed-history',
@@ -98,19 +79,16 @@ describe('atomic sync snapshot application', () => {
       url: 'https://example.com/removed-favorite',
     });
 
-    await saveStopwatchRecord(record);
     await recordResultAction(history);
     await saveFavorite(favorite);
 
     const applied = await applySyncSnapshotIfUnchanged(
       {
-        stopwatchRecords: [record],
         resultHistory: [history],
         favorites: [favorite],
         tombstones: [],
       },
       {
-        stopwatchRecords: [],
         resultHistory: [],
         favorites: [],
         tombstones: [],
@@ -118,13 +96,11 @@ describe('atomic sync snapshot application', () => {
     );
 
     expect(applied).toBe(true);
-    expect(await listStopwatchRecords()).toEqual([]);
     expect(await listResultHistory()).toEqual([]);
     expect(await listFavorites()).toEqual([]);
     expect((await listSyncTombstones()).map((item) => item.key).sort()).toEqual([
       'favorites:removed-favorite',
       'resultHistory:removed-history',
-      'stopwatchRecords:removed-record',
     ]);
   });
 
@@ -137,9 +113,8 @@ describe('atomic sync snapshot application', () => {
     });
 
     const applied = await applySyncSnapshotIfUnchanged(
-      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+      { resultHistory: [], favorites: [], tombstones: [] },
       {
-        stopwatchRecords: [],
         resultHistory: [],
         favorites: [sampleFavorite({ id: 'deleted-during-sync' })],
         tombstones: [],
@@ -167,8 +142,8 @@ describe('atomic sync snapshot application', () => {
 
     const staleFavorite = sampleFavorite({ id: 'already-deleted' });
     const applied = await applySyncSnapshotIfUnchanged(
-      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [tombstone] },
-      { stopwatchRecords: [], resultHistory: [], favorites: [staleFavorite], tombstones: [] },
+      { resultHistory: [], favorites: [], tombstones: [tombstone] },
+      { resultHistory: [], favorites: [staleFavorite], tombstones: [] },
     );
 
     expect(applied).toBe(true);
@@ -186,9 +161,8 @@ describe('atomic sync snapshot application', () => {
     await saveSyncTombstone(localTombstone);
 
     const applied = await applySyncSnapshotIfUnchanged(
-      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [localTombstone] },
+      { resultHistory: [], favorites: [], tombstones: [localTombstone] },
       {
-        stopwatchRecords: [],
         resultHistory: [],
         favorites: [],
         tombstones: [{ ...localTombstone, deletedAt: 1_000 }],
@@ -204,9 +178,8 @@ describe('atomic sync snapshot application', () => {
     await saveFavorite(local);
 
     const applied = await applySyncSnapshotIfUnchanged(
-      { stopwatchRecords: [], resultHistory: [], favorites: [], tombstones: [] },
+      { resultHistory: [], favorites: [], tombstones: [] },
       {
-        stopwatchRecords: [],
         resultHistory: [],
         favorites: [sampleFavorite({ id: 'remote-item', url: 'https://example.com/remote' })],
         tombstones: [],
@@ -215,39 +188,6 @@ describe('atomic sync snapshot application', () => {
 
     expect(applied).toBe(false);
     expect(await listFavorites()).toEqual([local]);
-  });
-});
-
-describe('IndexedDB stopwatch records', () => {
-  it('saves and reads records newest first', async () => {
-    await saveStopwatchRecord(sampleRecord({ id: 'older', createdAt: 10 }));
-    await saveStopwatchRecord(sampleRecord({ id: 'newer', createdAt: 20 }));
-
-    expect((await listStopwatchRecords()).map((record) => record.id)).toEqual(['newer', 'older']);
-  });
-
-  it('updates a record with the same ID instead of duplicating it', async () => {
-    await saveStopwatchRecord(sampleRecord({ title: 'first version' }));
-    await saveStopwatchRecord(sampleRecord({ title: 'updated version', durationMs: 9_000 }));
-
-    const records = await listStopwatchRecords();
-    expect(records).toHaveLength(1);
-    expect(records[0].title).toBe('updated version');
-    expect(records[0].durationMs).toBe(9_000);
-  });
-
-  it('deletes only the selected record', async () => {
-    await saveStopwatchRecord(sampleRecord({ id: 'keep' }));
-    await saveStopwatchRecord(sampleRecord({ id: 'remove', createdAt: 7_000 }));
-    await deleteStopwatchRecord('remove');
-
-    expect((await listStopwatchRecords()).map((record) => record.id)).toEqual(['keep']);
-  });
-
-  it('preserves timestamps and elapsed duration as stored values', async () => {
-    const record = sampleRecord({ startedAt: 123, endedAt: 456_789, durationMs: 456_666 });
-    await saveStopwatchRecord(record);
-    expect(await listStopwatchRecords()).toEqual([record]);
   });
 });
 
@@ -269,13 +209,12 @@ describe('IndexedDB favorites', () => {
     expect(favorites[0].notes).toBe('useful note');
   });
 
-  it('deletes a favorite without touching stopwatch records', async () => {
-    await saveFavorite(sampleFavorite());
-    await saveStopwatchRecord(sampleRecord());
-    await deleteFavorite('favorite-1');
+  it('deletes only the selected favorite', async () => {
+    await saveFavorite(sampleFavorite({ id: 'keep' }));
+    await saveFavorite(sampleFavorite({ id: 'remove', url: 'https://example.com/remove' }));
+    await deleteFavorite('remove');
 
-    expect(await listFavorites()).toEqual([]);
-    expect(await listStopwatchRecords()).toHaveLength(1);
+    expect((await listFavorites()).map((item) => item.id)).toEqual(['keep']);
   });
   it('keeps deletion tombstones increasing if the system clock moves backwards', async () => {
     await saveFavorite(sampleFavorite());
@@ -296,38 +235,61 @@ describe('IndexedDB favorites', () => {
 });
 
 describe('atomic backup import', () => {
-  it('imports records and favorites and clears tombstones for restored entries', async () => {
-    const record = sampleRecord();
+  it('imports history and favorites and clears tombstones for restored entries', async () => {
+    const history = {
+      id: 'history-1',
+      url: 'https://example.com/history',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 100,
+    };
     const favorite = sampleFavorite();
     await saveFavorite(favorite);
     await deleteFavorite(favorite.id);
     expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(true);
 
-    await importBackupData([record], [], [favorite]);
+    await importBackupData([history], [favorite]);
 
-    expect((await listStopwatchRecords()).map((item) => item.id)).toEqual([record.id]);
+    expect((await listResultHistory()).map((item) => item.id)).toEqual([history.id]);
     expect((await listFavorites()).map((item) => item.id)).toEqual([favorite.id]);
     expect((await listSyncTombstones()).some((item) => item.key === `favorites:${favorite.id}`)).toBe(false);
   });
 
   it('rejects invalid entries before writing any imported records', async () => {
-    const valid = sampleRecord({ id: 'should-roll-back' });
-    const invalid = { title: 'missing ID' } as unknown as StopwatchRecord;
+    const validHistory = {
+      id: 'should-roll-back',
+      url: 'https://example.com/valid',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 100,
+    };
+    const invalid = { title: 'missing ID' } as unknown as typeof validHistory;
 
-    await expect(importBackupData([valid, invalid], [], [])).rejects.toBeTruthy();
-    expect(await listStopwatchRecords()).toEqual([]);
+    await expect(importBackupData([validHistory, invalid], [])).rejects.toBeTruthy();
+    expect(await listResultHistory()).toEqual([]);
   });
 
   it('rejects unknown fields during direct backup import', async () => {
-    const valid = sampleRecord({ id: 'must-not-write' });
-    const unknownField = { ...sampleRecord({ id: 'unknown-field' }), injected: true } as unknown as StopwatchRecord;
+    const validHistory = {
+      id: 'must-not-write',
+      url: 'https://example.com/valid',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 100,
+    };
+    const unknownField = { ...validHistory, id: 'unknown-field', injected: true } as unknown as typeof validHistory;
 
-    await expect(importBackupData([valid, unknownField], [], [])).rejects.toThrow();
-    expect(await listStopwatchRecords()).toEqual([]);
+    await expect(importBackupData([validHistory, unknownField], [])).rejects.toThrow();
+    expect(await listResultHistory()).toEqual([]);
   });
 
   it('rejects whitespace-only IDs in every backup entity before writing', async () => {
-    const blankRecord = sampleRecord({ id: '   ' });
     const blankHistory = {
       id: '\t ',
       url: 'https://example.com/blank-history',
@@ -339,27 +301,29 @@ describe('atomic backup import', () => {
     };
     const blankFavorite = sampleFavorite({ id: ' ' });
 
-    await expect(importBackupData([blankRecord], [], [])).rejects.toThrow();
-    await expect(importBackupData([], [blankHistory], [])).rejects.toThrow();
-    await expect(importBackupData([], [], [blankFavorite])).rejects.toThrow();
-    expect(await listStopwatchRecords()).toEqual([]);
+    await expect(importBackupData([blankHistory], [])).rejects.toThrow();
+    await expect(importBackupData([], [blankFavorite])).rejects.toThrow();
     expect(await listResultHistory()).toEqual([]);
     expect(await listFavorites()).toEqual([]);
   });
 
   it('rejects malformed fields and unsafe URLs before opening a write transaction', async () => {
-    const valid = sampleRecord({ id: 'must-not-write' });
-    const malformedRecord = sampleRecord({ id: 'bad-duration', durationMs: -1 });
-    await expect(importBackupData([valid, malformedRecord], [], [])).rejects.toThrow();
-    expect(await listStopwatchRecords()).toEqual([]);
-
-    const reversedTimestamps = sampleRecord({ id: 'reversed', startedAt: 7_000, endedAt: 6_000 });
-    await expect(importBackupData([valid, reversedTimestamps], [], [])).rejects.toThrow();
-    expect(await listStopwatchRecords()).toEqual([]);
+    const validHistory = {
+      id: 'must-not-write',
+      url: 'https://example.com/valid',
+      source: 'example',
+      sourceLabel: 'Example',
+      lastAction: 'open' as const,
+      lastActionAt: 100,
+      createdAt: 100,
+    };
+    const malformedHistory = { ...validHistory, id: 'bad-timestamp', lastActionAt: -1 };
+    await expect(importBackupData([validHistory, malformedHistory], [])).rejects.toThrow();
+    expect(await listResultHistory()).toEqual([]);
 
     const unsafeFavorite = sampleFavorite({ url: 'javascript:alert(1)' });
-    await expect(importBackupData([valid], [], [unsafeFavorite])).rejects.toThrow();
-    expect(await listStopwatchRecords()).toEqual([]);
+    await expect(importBackupData([], [unsafeFavorite])).rejects.toThrow();
+    expect(await listFavorites()).toEqual([]);
   });
 
   it('remaps imported IDs that already belong to different URLs', async () => {
@@ -380,7 +344,7 @@ describe('atomic backup import', () => {
     await recordResultAction(existingHistory);
     await saveFavorite(existingFavorite);
 
-    await importBackupData([], [{
+    await importBackupData([{
       ...existingHistory,
       url: 'https://example.com/imported-history',
       sourceLabel: 'Imported history',
@@ -412,7 +376,7 @@ describe('atomic backup import', () => {
       sourceLabel: 'Example', lastAction: 'open' as const, lastActionAt: 20, createdAt: 10,
     };
     await recordResultAction(existing);
-    await importBackupData([], [{
+    await importBackupData([{
       ...existing, id: 'imported-history', lastAction: 'copy', lastActionAt: 30, createdAt: 5,
     }], []);
 

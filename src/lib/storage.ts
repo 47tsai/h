@@ -1,14 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
-export interface StopwatchRecord {
-  id: string;
-  startedAt: number;
-  endedAt: number;
-  durationMs: number;
-  title: string;
-  createdAt: number;
-}
-
 export interface ResultHistoryItem {
   id: string;
   url: string;
@@ -19,7 +10,7 @@ export interface ResultHistoryItem {
   createdAt: number;
 }
 
-export type SyncEntity = 'stopwatchRecords' | 'resultHistory' | 'favorites';
+export type SyncEntity = 'resultHistory' | 'favorites';
 
 export interface SyncTombstone {
   key: string;
@@ -39,11 +30,6 @@ export interface FavoriteItem {
 }
 
 interface HToolsDB extends DBSchema {
-  'stopwatch-records': {
-    key: string;
-    value: StopwatchRecord;
-    indexes: { 'by-createdAt': number };
-  };
   favorites: {
     key: string;
     value: FavoriteItem;
@@ -73,12 +59,8 @@ export async function closeStorageDatabase(): Promise<void> {
 
 function getDatabase() {
   if (!globalThis.indexedDB) return Promise.reject(new Error('此環境不支援 IndexedDB，無法保存紀錄。'));
-  databasePromise ??= openDB<HToolsDB>('h-tools', 4, {
+  databasePromise ??= openDB<HToolsDB>('h-tools', 5, {
     upgrade(db, oldVersion) {
-      if (oldVersion < 1 && !db.objectStoreNames.contains('stopwatch-records')) {
-        const store = db.createObjectStore('stopwatch-records', { keyPath: 'id' });
-        store.createIndex('by-createdAt', 'createdAt');
-      }
       if (oldVersion < 2 && !db.objectStoreNames.contains('favorites')) {
         const store = db.createObjectStore('favorites', { keyPath: 'id' });
         store.createIndex('by-createdAt', 'createdAt');
@@ -92,28 +74,13 @@ function getDatabase() {
       if (oldVersion < 4 && !db.objectStoreNames.contains('sync-tombstones')) {
         db.createObjectStore('sync-tombstones', { keyPath: 'key' });
       }
+      // v5: stopwatch removed — drop its store (and all saved stopwatch records) on upgrade.
+      if (oldVersion < 5 && db.objectStoreNames.contains('stopwatch-records')) {
+        db.deleteObjectStore('stopwatch-records');
+      }
     },
   });
   return databasePromise;
-}
-
-export async function listStopwatchRecords(): Promise<StopwatchRecord[]> {
-  const db = await getDatabase();
-  return (await db.getAllFromIndex('stopwatch-records', 'by-createdAt')).reverse();
-}
-export async function saveStopwatchRecord(record: StopwatchRecord): Promise<void> {
-  const db = await getDatabase();
-  await db.put('stopwatch-records', record);
-}
-export async function deleteStopwatchRecord(id: string): Promise<void> {
-  const db = await getDatabase();
-  const tx = db.transaction(['stopwatch-records', 'sync-tombstones'], 'readwrite');
-  await tx.objectStore('stopwatch-records').delete(id);
-  const tombstones = tx.objectStore('sync-tombstones');
-  const key = `stopwatchRecords:${id}`;
-  const current = await tombstones.get(key);
-  await tombstones.put({ key, entity: 'stopwatchRecords', id, deletedAt: Math.max(Date.now(), (current?.deletedAt ?? 0) + 1) });
-  await tx.done;
 }
 
 export async function listResultHistory(): Promise<ResultHistoryItem[]> {
@@ -169,15 +136,13 @@ export async function deleteFavorite(id: string): Promise<void> {
 export async function clearAllSyncableData(): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction(
-    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    ['result-history', 'favorites', 'sync-tombstones'],
     'readwrite',
   );
-  const recordsStore = tx.objectStore('stopwatch-records');
   const historyStore = tx.objectStore('result-history');
   const favoritesStore = tx.objectStore('favorites');
   const tombstonesStore = tx.objectStore('sync-tombstones');
-  const [records, history, favorites, tombstones] = await Promise.all([
-    recordsStore.getAll(),
+  const [history, favorites, tombstones] = await Promise.all([
     historyStore.getAll(),
     favoritesStore.getAll(),
     tombstonesStore.getAll(),
@@ -194,12 +159,10 @@ export async function clearAllSyncableData(): Promise<void> {
       deletedAt: Math.max(now, (existing?.deletedAt ?? 0) + 1),
     });
   };
-  for (const item of records) addTombstone('stopwatchRecords', item.id);
   for (const item of history) addTombstone('resultHistory', item.id);
   for (const item of favorites) addTombstone('favorites', item.id);
 
   await Promise.all([
-    recordsStore.clear(),
     historyStore.clear(),
     favoritesStore.clear(),
     ...[...tombstonesByKey.values()].map((item) => tombstonesStore.put(item)),
@@ -208,7 +171,6 @@ export async function clearAllSyncableData(): Promise<void> {
 }
 
 export interface SyncStorageSnapshot {
-  stopwatchRecords: StopwatchRecord[];
   resultHistory: ResultHistoryItem[];
   favorites: FavoriteItem[];
   tombstones: SyncTombstone[];
@@ -225,25 +187,22 @@ export async function applySyncSnapshotIfUnchanged(
 ): Promise<boolean> {
   const db = await getDatabase();
   const tx = db.transaction(
-    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    ['result-history', 'favorites', 'sync-tombstones'],
     'readwrite',
   );
-  const recordsStore = tx.objectStore('stopwatch-records');
   const historyStore = tx.objectStore('result-history');
   const favoritesStore = tx.objectStore('favorites');
   const tombstonesStore = tx.objectStore('sync-tombstones');
 
-  const [records, history, favorites, tombstones] = await Promise.all([
-    recordsStore.getAll(), historyStore.getAll(), favoritesStore.getAll(), tombstonesStore.getAll(),
+  const [history, favorites, tombstones] = await Promise.all([
+    historyStore.getAll(), favoritesStore.getAll(), tombstonesStore.getAll(),
   ]);
   const stable = (snapshot: SyncStorageSnapshot) => JSON.stringify({
-    stopwatchRecords: [...snapshot.stopwatchRecords].sort((a, b) => a.id.localeCompare(b.id)),
     resultHistory: [...snapshot.resultHistory].sort((a, b) => a.id.localeCompare(b.id)),
     favorites: [...snapshot.favorites].sort((a, b) => a.id.localeCompare(b.id)),
     tombstones: [...snapshot.tombstones].sort((a, b) => a.key.localeCompare(b.key)),
   });
   const current: SyncStorageSnapshot = {
-    stopwatchRecords: records,
     resultHistory: history,
     favorites,
     tombstones,
@@ -265,12 +224,10 @@ export async function applySyncSnapshotIfUnchanged(
     }
   }
   const safeNext = {
-    stopwatchRecords: next.stopwatchRecords.filter((item) => !tombstonesToWrite.has('stopwatchRecords:' + item.id)),
     resultHistory: next.resultHistory.filter((item) => !tombstonesToWrite.has('resultHistory:' + item.id)),
     favorites: next.favorites.filter((item) => !tombstonesToWrite.has('favorites:' + item.id)),
   };
   const nextIds = {
-    stopwatchRecords: new Set(safeNext.stopwatchRecords.map((item) => item.id)),
     resultHistory: new Set(safeNext.resultHistory.map((item) => item.id)),
     favorites: new Set(safeNext.favorites.map((item) => item.id)),
   };
@@ -285,18 +242,15 @@ export async function applySyncSnapshotIfUnchanged(
       deletedAt: Math.max(Date.now(), (existing?.deletedAt ?? 0) + 1),
     });
   };
-  for (const item of records) preserveRemovedId('stopwatchRecords', item.id);
   for (const item of history) preserveRemovedId('resultHistory', item.id);
   for (const item of favorites) preserveRemovedId('favorites', item.id);
 
   await Promise.all([
-    recordsStore.clear(),
     historyStore.clear(),
     favoritesStore.clear(),
     tombstonesStore.clear(),
   ]);
   await Promise.all([
-    ...safeNext.stopwatchRecords.map((item) => recordsStore.put(item)),
     ...safeNext.resultHistory.map((item) => historyStore.put(item)),
     ...safeNext.favorites.map((item) => favoritesStore.put(item)),
     ...[...tombstonesToWrite.values()].map((item) => tombstonesStore.put(item)),
@@ -322,12 +276,11 @@ export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void>
 }
 
 export async function importBackupData(
-  importedRecords: StopwatchRecord[],
   importedHistory: ResultHistoryItem[],
   importedFavorites: FavoriteItem[],
 ): Promise<void> {
-  if (!Array.isArray(importedRecords) || !Array.isArray(importedHistory) || !Array.isArray(importedFavorites)
-    || importedRecords.length > 10000 || importedHistory.length > 10000 || importedFavorites.length > 10000) {
+  if (!Array.isArray(importedHistory) || !Array.isArray(importedFavorites)
+    || importedHistory.length > 10000 || importedFavorites.length > 10000) {
     throw new Error('備份資料結構不正確，或單一類型資料超過 10,000 筆。');
   }
   const isObject = (item: unknown): item is Record<string, unknown> =>
@@ -347,12 +300,6 @@ export async function importBackupData(
       return false;
     }
   };
-  const validRecord = (value: unknown): value is StopwatchRecord => hasValidId(value)
-    && hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
-    && typeof value.title === 'string' && value.title.length <= 500
-    && isTimestamp(value.startedAt) && isTimestamp(value.endedAt)
-    && value.endedAt >= value.startedAt
-    && isTimestamp(value.durationMs) && isTimestamp(value.createdAt);
   const validHistory = (value: unknown): value is ResultHistoryItem => hasValidId(value)
     && hasOnlyKeys(value, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
     && isSafeHttpUrl(value.url)
@@ -369,18 +316,17 @@ export async function importBackupData(
     && isTimestamp(value.createdAt) && isTimestamp(value.updatedAt);
   const hasUniqueIds = (items: { id: string }[]) => new Set(items.map((item) => item.id)).size === items.length;
   const hasUniqueUrls = (items: { url: string }[]) => new Set(items.map((item) => item.url)).size === items.length;
-  if (!importedRecords.every(validRecord) || !importedHistory.every(validHistory) || !importedFavorites.every(validFavorite)
-    || !hasUniqueIds(importedRecords) || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
+  if (!importedHistory.every(validHistory) || !importedFavorites.every(validFavorite)
+    || !hasUniqueIds(importedHistory) || !hasUniqueIds(importedFavorites)
     || !hasUniqueUrls(importedHistory) || !hasUniqueUrls(importedFavorites)) {
     throw new Error('備份包含無效或重複的欄位、ID 或網址，未匯入任何內容。');
   }
 
   const db = await getDatabase();
   const tx = db.transaction(
-    ['stopwatch-records', 'result-history', 'favorites', 'sync-tombstones'],
+    ['result-history', 'favorites', 'sync-tombstones'],
     'readwrite',
   );
-  const recordsStore = tx.objectStore('stopwatch-records');
   const historyStore = tx.objectStore('result-history');
   const favoritesStore = tx.objectStore('favorites');
   const tombstonesStore = tx.objectStore('sync-tombstones');
@@ -395,11 +341,6 @@ export async function importBackupData(
     const favoriteByUrl = new Map(currentFavorites.map((item) => [item.url, item]));
     const favoriteById = new Map(currentFavorites.map((item) => [item.id, item]));
     const writes: Promise<unknown>[] = [];
-
-    for (const item of importedRecords) {
-      writes.push(recordsStore.put(item));
-      writes.push(tombstonesStore.delete(`stopwatchRecords:${item.id}`));
-    }
 
     for (const item of importedHistory) {
       const existingByUrl = historyByUrl.get(item.url);

@@ -3,13 +3,9 @@ import { validateBackupData } from './backup';
 
 const validBackup = () => ({
   format: 'h-tools-backup',
-  schemaVersion: 1,
+  schemaVersion: 2,
   exportedAt: '2026-10-12T12:00:00.000Z',
   settings: { theme: 'dark' },
-  stopwatchRecords: [{
-    id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100,
-    title: 'Timer', createdAt: 200,
-  }],
   resultHistory: [{
     id: 'history-1', url: 'https://example.com/item/1', source: 'example',
     sourceLabel: 'Example', lastAction: 'open', lastActionAt: 200, createdAt: 100,
@@ -25,23 +21,11 @@ describe('backup validation', () => {
     const backup = validBackup();
     expect(validateBackupData(backup)).toMatchObject({
       settings: { theme: 'dark' },
-      stopwatchRecords: backup.stopwatchRecords,
       resultHistory: backup.resultHistory,
       favorites: backup.favorites,
     });
     expect(validateBackupData(backup)).not.toHaveProperty('format');
     expect(validateBackupData(backup)).not.toHaveProperty('exportedAt');
-  });
-
-  it('rejects malformed records before import can begin', () => {
-    const backup = validBackup();
-    backup.stopwatchRecords[0].durationMs = -1;
-    expect(() => validateBackupData(backup)).toThrow();
-
-    const reversedTimestamps = validBackup();
-    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
-    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
-    expect(() => validateBackupData(reversedTimestamps)).toThrow();
   });
 
   it('rejects unsafe URLs and duplicate history or favorite URLs', () => {
@@ -60,7 +44,7 @@ describe('backup validation', () => {
 
   it('rejects unknown fields and malformed settings', () => {
     const extraField = validBackup();
-    Object.assign(extraField.stopwatchRecords[0], { unexpected: true });
+    Object.assign(extraField.resultHistory[0], { unexpected: true });
     expect(() => validateBackupData(extraField)).toThrow();
 
     const badSettings = validBackup();
@@ -69,10 +53,6 @@ describe('backup validation', () => {
   });
 
   it('rejects whitespace-only IDs in every backup entity', () => {
-    const blankRecord = validBackup();
-    blankRecord.stopwatchRecords[0].id = '   ';
-    expect(() => validateBackupData(blankRecord)).toThrow();
-
     const blankHistory = validBackup();
     blankHistory.resultHistory[0].id = '\t ';
     expect(() => validateBackupData(blankHistory)).toThrow();
@@ -83,10 +63,6 @@ describe('backup validation', () => {
   });
 
   it('rejects IDs longer than the supported limit', () => {
-    const record = validBackup();
-    record.stopwatchRecords[0].id = 'x'.repeat(201);
-    expect(() => validateBackupData(record)).toThrow();
-
     const history = validBackup();
     history.resultHistory[0].id = 'x'.repeat(201);
     expect(() => validateBackupData(history)).toThrow();
@@ -99,7 +75,6 @@ describe('backup validation', () => {
   it('accepts IDs at the maximum supported length', () => {
     const backup = validBackup();
     const maxId = 'x'.repeat(200);
-    backup.stopwatchRecords[0].id = maxId;
     backup.resultHistory[0].id = maxId;
     backup.favorites[0].id = maxId;
     expect(() => validateBackupData(backup)).not.toThrow();
@@ -107,11 +82,18 @@ describe('backup validation', () => {
 
   it('rejects duplicate IDs and unsupported backup versions', () => {
     const duplicate = validBackup();
-    duplicate.stopwatchRecords.push({ ...duplicate.stopwatchRecords[0] });
+    duplicate.resultHistory.push({ ...duplicate.resultHistory[0], id: 'history-2' });
     expect(() => validateBackupData(duplicate)).toThrow();
 
     const wrongVersion = validBackup();
     wrongVersion.schemaVersion = 99;
     expect(() => validateBackupData(wrongVersion)).toThrow();
+
+    const oldVersion = validBackup();
+    oldVersion.schemaVersion = 1;
+    Object.assign(oldVersion, {
+      stopwatchRecords: [{ id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100, title: 'Timer', createdAt: 200 }],
+    });
+    expect(() => validateBackupData(oldVersion)).toThrow();
   });
 });

@@ -1,7 +1,7 @@
 const MAX_BODY_BYTES = 800 * 1024;
 const MAX_ITEMS = 10000;
 const MAX_RETRIES = 3;
-const ALLOWED_ENTITIES = ['stopwatchRecords', 'resultHistory', 'favorites'];
+const ALLOWED_ENTITIES = ['resultHistory', 'favorites'];
 
 function json(data, status, origin) {
   return new Response(JSON.stringify(data), {
@@ -57,13 +57,6 @@ function hasOnlyKeys(value, allowed) {
 
 function validItem(entity, value) {
   if (!isPlainObject(value) || typeof value.id !== 'string' || !value.id.trim() || value.id.length > 200) return false;
-  if (entity === 'stopwatchRecords') {
-    return hasOnlyKeys(value, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
-      && typeof value.title === 'string' && value.title.length <= 500
-      && safeInteger(value.startedAt) && safeInteger(value.endedAt)
-      && value.endedAt >= value.startedAt
-      && safeInteger(value.durationMs) && safeInteger(value.createdAt);
-  }
   if (entity === 'resultHistory') {
     return hasOnlyKeys(value, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
       && isSafeHttpUrl(value.url) && typeof value.source === 'string' && value.source.length <= 200
@@ -93,8 +86,8 @@ function isSafeHttpUrl(value) {
 
 function validateDocument(doc) {
   if (!isPlainObject(doc)
-    || !hasOnlyKeys(doc, ['schemaVersion', 'updatedAt', 'settings', 'stopwatchRecords', 'resultHistory', 'favorites', 'tombstones'])
-    || doc.schemaVersion !== 1 || typeof doc.updatedAt !== 'string'
+    || !hasOnlyKeys(doc, ['schemaVersion', 'updatedAt', 'settings', 'resultHistory', 'favorites', 'tombstones'])
+    || doc.schemaVersion !== 2 || typeof doc.updatedAt !== 'string'
     || !Number.isFinite(Date.parse(doc.updatedAt))) return false;
   for (const entity of ALLOWED_ENTITIES) {
     if (!Array.isArray(doc[entity]) || doc[entity].length > MAX_ITEMS
@@ -108,8 +101,7 @@ function validateDocument(doc) {
     }
     return true;
   };
-  if (!hasUnique(doc.stopwatchRecords, 'id')
-    || !hasUnique(doc.resultHistory, 'id') || !hasUnique(doc.resultHistory, 'url')
+  if (!hasUnique(doc.resultHistory, 'id') || !hasUnique(doc.resultHistory, 'url')
     || !hasUnique(doc.favorites, 'id') || !hasUnique(doc.favorites, 'url')) return false;
   if (!Array.isArray(doc.tombstones) || doc.tombstones.length > MAX_ITEMS * 3) return false;
   if (!doc.tombstones.every((item) => isPlainObject(item)
@@ -120,8 +112,7 @@ function validateDocument(doc) {
     && safeInteger(item.deletedAt))
     || !hasUnique(doc.tombstones, 'key')) return false;
   const tombstoneKeys = new Set(doc.tombstones.map((item) => item.key));
-  if (doc.stopwatchRecords.some((item) => tombstoneKeys.has('stopwatchRecords:' + item.id))
-    || doc.resultHistory.some((item) => tombstoneKeys.has('resultHistory:' + item.id))
+  if (doc.resultHistory.some((item) => tombstoneKeys.has('resultHistory:' + item.id))
     || doc.favorites.some((item) => tombstoneKeys.has('favorites:' + item.id))) return false;
   const settings = doc.settings;
   if (!isPlainObject(settings) || !hasOnlyKeys(settings, ['theme'])
@@ -130,7 +121,6 @@ function validateDocument(doc) {
 }
 
 function itemTimestamp(entity, item) {
-  if (entity === 'stopwatchRecords') return item.createdAt;
   if (entity === 'resultHistory') return item.lastActionAt;
   return item.updatedAt;
 }
@@ -143,7 +133,7 @@ function mergeDocuments(local, remote) {
   }
   const tombstones = [...tombstoneMap.values()];
   const deleted = new Set(tombstones.map((item) => item.key));
-  const merged = { schemaVersion: 1, updatedAt: new Date().toISOString(), settings: {}, tombstones };
+  const merged = { schemaVersion: 2, updatedAt: new Date().toISOString(), settings: {}, tombstones };
 
   for (const entity of ALLOWED_ENTITIES) {
     const byId = new Map();

@@ -2,13 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import worker from './index.js';
 
 const validDocument = () => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   updatedAt: '2026-10-12T12:00:00.000Z',
   settings: { theme: 'dark' },
-  stopwatchRecords: [{
-    id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100,
-    title: 'Timer', createdAt: 200,
-  }],
   resultHistory: [{
     id: 'history-1', url: 'https://example.com/item/1', source: 'example',
     sourceLabel: 'Example', lastAction: 'open', lastActionAt: 200, createdAt: 100,
@@ -55,10 +51,6 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('sync Worker request validation', () => {
   it('rejects duplicate IDs, URLs, and tombstone keys before remote access', async () => {
-    const duplicateRecord = validDocument();
-    duplicateRecord.stopwatchRecords.push({ ...duplicateRecord.stopwatchRecords[0] });
-    expect((await send(duplicateRecord)).status).toBe(400);
-
     const duplicateHistoryUrl = validDocument();
     duplicateHistoryUrl.resultHistory.push({
       ...duplicateHistoryUrl.resultHistory[0], id: 'history-2',
@@ -77,12 +69,6 @@ describe('sync Worker request validation', () => {
   });
 
   it('rejects live records that conflict with deletion tombstones', async () => {
-    const recordConflict = validDocument();
-    recordConflict.tombstones.push({
-      key: 'stopwatchRecords:record-1', entity: 'stopwatchRecords', id: 'record-1', deletedAt: 300,
-    });
-    expect((await send(recordConflict)).status).toBe(400);
-
     const historyConflict = validDocument();
     historyConflict.tombstones.push({
       key: 'resultHistory:history-1', entity: 'resultHistory', id: 'history-1', deletedAt: 300,
@@ -96,18 +82,20 @@ describe('sync Worker request validation', () => {
     expect((await send(favoriteConflict)).status).toBe(400);
   });
 
-  it('rejects stopwatch records whose end time precedes their start time', async () => {
-    const reversedTimestamps = validDocument();
-    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
-    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
-    expect((await send(reversedTimestamps)).status).toBe(400);
+  it('rejects version 1 documents and documents still carrying stopwatch records', async () => {
+    const oldVersion = validDocument();
+    oldVersion.schemaVersion = 1;
+    oldVersion.stopwatchRecords = [{
+      id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100, title: 'Timer', createdAt: 200,
+    }];
+    expect((await send(oldVersion)).status).toBe(400);
+
+    const withStopwatchField = validDocument();
+    withStopwatchField.stopwatchRecords = [];
+    expect((await send(withStopwatchField)).status).toBe(400);
   });
 
   it('rejects blank IDs in every entity and tombstones', async () => {
-    const blankRecordId = validDocument();
-    blankRecordId.stopwatchRecords[0].id = '   ';
-    expect((await send(blankRecordId)).status).toBe(400);
-
     const blankHistoryId = validDocument();
     blankHistoryId.resultHistory[0].id = '\t ';
     expect((await send(blankHistoryId)).status).toBe(400);
@@ -123,10 +111,6 @@ describe('sync Worker request validation', () => {
   });
 
   it('rejects IDs longer than the supported limit', async () => {
-    const record = validDocument();
-    record.stopwatchRecords[0].id = 'x'.repeat(201);
-    expect((await send(record)).status).toBe(400);
-
     const history = validDocument();
     history.resultHistory[0].id = 'x'.repeat(201);
     expect((await send(history)).status).toBe(400);
@@ -146,10 +130,6 @@ describe('sync Worker request validation', () => {
     extraTopLevel.unexpected = true;
     expect((await send(extraTopLevel)).status).toBe(400);
 
-    const extraRecordField = validDocument();
-    extraRecordField.stopwatchRecords[0].unexpected = true;
-    expect((await send(extraRecordField)).status).toBe(400);
-
     const extraTombstoneField = validDocument();
     extraTombstoneField.tombstones[0].unexpected = true;
     expect((await send(extraTombstoneField)).status).toBe(400);
@@ -164,7 +144,6 @@ describe('sync Worker request validation', () => {
   it('accepts IDs at the maximum supported length', async () => {
     const document = validDocument();
     const maxId = 'x'.repeat(200);
-    document.stopwatchRecords[0].id = maxId;
     document.resultHistory[0].id = maxId;
     document.favorites[0].id = maxId;
     document.resultHistory[0].url = 'https://example.com/max-history';
@@ -177,7 +156,6 @@ describe('sync Worker request validation', () => {
     });
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.document.stopwatchRecords.some((item) => item.id === maxId)).toBe(true);
     expect(body.document.resultHistory.some((item) => item.id === maxId)).toBe(true);
     expect(body.document.favorites.some((item) => item.id === maxId)).toBe(true);
     expect(body.document.tombstones.some((item) => item.id === 'y'.repeat(200))).toBe(true);
@@ -203,14 +181,14 @@ describe('sync Worker merge behavior', () => {
     GITHUB_FILE_PATH: 'data/sync.json',
   };
 
-  it('does not resurrect a local record deleted on another device', async () => {
+  it('does not resurrect a local history item deleted on another device', async () => {
     const local = validDocument();
     const remote = validDocument();
-    remote.stopwatchRecords = [];
+    remote.resultHistory = [];
     remote.tombstones = [{
-      key: 'stopwatchRecords:record-1',
-      entity: 'stopwatchRecords',
-      id: 'record-1',
+      key: 'resultHistory:history-1',
+      entity: 'resultHistory',
+      id: 'history-1',
       deletedAt: 300,
     }];
     const saved = mockGitHub(remote);
@@ -218,10 +196,10 @@ describe('sync Worker merge behavior', () => {
     const response = await send(local, githubEnv);
     expect(response.status).toBe(200);
     const result = await response.json();
-    expect(result.document.stopwatchRecords).toEqual([]);
+    expect(result.document.resultHistory).toEqual([]);
     expect(result.document.tombstones).toContainEqual(remote.tombstones[0]);
     expect(saved).toHaveLength(1);
-    expect(saved[0].stopwatchRecords).toEqual([]);
+    expect(saved[0].resultHistory).toEqual([]);
   });
 
   it('uses remote data when matching records have equal timestamps', async () => {

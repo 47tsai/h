@@ -21,7 +21,7 @@
 - Astro、Svelte 5、TypeScript、Tailwind CSS 4 網站架構。
 - 響應式導覽與淺色／深色／系統主題。
 - 編號轉換器、多來源網址產生、歷史紀錄、收藏、搜尋與排序。
-- IndexedDB 本機保存、純碼錶與時間統計。
+- IndexedDB 本機保存。
 - JSON 備份匯入／匯出，匯入資料會驗證 schema、欄位、ID、URL 與筆數上限。
 - Cloudflare Worker 手動同步，包含資料驗證、合併、刪除標記及 GitHub SHA 衝突重試。
 - CI 執行型別檢查、測試與建置；網站與 Worker 有部署流程。

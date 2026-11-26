@@ -6,17 +6,15 @@
 
 ```ts
 type SyncDocument = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   updatedAt: string;
   settings: { theme?: 'system' | 'light' | 'dark' };
-  stopwatchRecords: StopwatchRecord[];
   resultHistory: ResultHistoryItem[];
   favorites: FavoriteItem[];
   tombstones: SyncTombstone[];
 };
 ```
 
-- `stopwatchRecords`：已保存的碼表紀錄，時間欄位使用毫秒時間戳。
 - `resultHistory`：轉換結果的開啟、複製或分享紀錄。
 - `favorites`：收藏網址、標題、備註與建立／更新時間。
 - `tombstones`：刪除標記，包含實體類型、ID、鍵值與刪除時間。
@@ -27,7 +25,6 @@ type SyncDocument = {
 Worker 先讀取雲端文件，再將雲端與本機資料合併。
 
 - 一般資料以 `id` 去重。
-- 碼表紀錄以 `createdAt` 比較。
 - 歷史紀錄以 `lastActionAt` 比較。
 - 收藏以 `updatedAt` 比較。
 - 歷史紀錄與收藏會額外依 URL 合併，避免相同網址重複存在。

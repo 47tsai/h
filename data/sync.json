@@ -1,16 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "updatedAt": "2026-11-26T09:53:25.058Z",
   "settings": {
     "theme": "system"
   },
   "tombstones": [
-    {
-      "key": "stopwatchRecords:61461320-ada0-4fc7-b5b6-90f561bec0e6",
-      "entity": "stopwatchRecords",
-      "id": "61461320-ada0-4fc7-b5b6-90f561bec0e6",
-      "deletedAt": 1791800279989
-    },
     {
       "key": "resultHistory:02592bfc-cda5-4f70-b525-9caa78183434",
       "entity": "resultHistory",
@@ -46,24 +40,6 @@
       "entity": "resultHistory",
       "id": "a0509816-a820-4923-85fb-ff6526074f88",
       "deletedAt": 1795686791304
-    }
-  ],
-  "stopwatchRecords": [
-    {
-      "id": "3f19cfcc-de71-4415-8ae1-ceb27e191c83",
-      "startedAt": 1791792015553,
-      "endedAt": 1791792879866,
-      "durationMs": 864313,
-      "title": "2026/10/12 16:00:15",
-      "createdAt": 1791792879866
-    },
-    {
-      "id": "d775a15d-f7d5-440c-9fc8-f10f09185f12",
-      "startedAt": 1791800298286,
-      "endedAt": 1791801972564,
-      "durationMs": 1674278,
-      "title": "2026/10/12 18:18:18",
-      "createdAt": 1791801972564
     }
   ],
   "resultHistory": [

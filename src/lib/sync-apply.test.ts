@@ -1,14 +1,13 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDB } from 'idb';
-import { listFavorites, listResultHistory, listStopwatchRecords, listSyncTombstones, recordResultAction, saveFavorite } from './storage';
+import { listFavorites, listResultHistory, listSyncTombstones, recordResultAction, saveFavorite } from './storage';
 import { syncWithCloud } from './sync';
 
 async function clearDatabase() {
-  await listStopwatchRecords();
-  const db = await openDB('h-tools', 4);
+  await listFavorites();
+  const db = await openDB('h-tools', 5);
   await Promise.all([
-    db.clear('stopwatch-records'),
     db.clear('favorites'),
     db.clear('result-history'),
     db.clear('sync-tombstones'),
@@ -33,10 +32,9 @@ describe('applying cloud sync results', () => {
     });
 
     const document = {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       updatedAt: '2026-10-12T12:00:00.000Z',
       settings: { theme: 'dark' as const },
-      stopwatchRecords: [],
       resultHistory: [],
       favorites: [{
         id: 'remote-favorite',
@@ -77,10 +75,9 @@ describe('applying cloud sync results', () => {
     });
 
     const document = {
-      schemaVersion: 1 as const,
+      schemaVersion: 2 as const,
       updatedAt: '2026-10-12T12:00:00.000Z',
       settings: { theme: 'dark' as const },
-      stopwatchRecords: [],
       resultHistory: [{
         id: 'remote-history',
         url: 'https://example.com/history',

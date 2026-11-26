@@ -2,13 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { isValidSyncDocument } from './sync';
 
 const validDocument = () => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   updatedAt: '2026-10-12T12:00:00.000Z',
   settings: { theme: 'dark' },
-  stopwatchRecords: [{
-    id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100,
-    title: 'Timer', createdAt: 200,
-  }],
   resultHistory: [{
     id: 'history-1', url: 'https://example.com/item/1', source: 'example',
     sourceLabel: 'Example', lastAction: 'open', lastActionAt: 200, createdAt: 100,
@@ -23,8 +19,21 @@ const validDocument = () => ({
 });
 
 describe('cloud sync document validation', () => {
-  it('accepts a valid version 1 document', () => {
+  it('accepts a valid version 2 document', () => {
     expect(isValidSyncDocument(validDocument())).toBe(true);
+  });
+
+  it('rejects a version 1 document and any document still carrying stopwatch records', () => {
+    const oldVersion = validDocument();
+    Object.assign(oldVersion, {
+      schemaVersion: 1,
+      stopwatchRecords: [{ id: 'record-1', startedAt: 100, endedAt: 200, durationMs: 100, title: 'Timer', createdAt: 200 }],
+    });
+    expect(isValidSyncDocument(oldVersion)).toBe(false);
+
+    const withStopwatchField = validDocument();
+    Object.assign(withStopwatchField, { stopwatchRecords: [] });
+    expect(isValidSyncDocument(withStopwatchField)).toBe(false);
   });
 
   it('rejects unknown fields in sync documents and records', () => {
@@ -32,20 +41,12 @@ describe('cloud sync document validation', () => {
     Object.assign(extraTopLevel, { unexpected: true });
     expect(isValidSyncDocument(extraTopLevel)).toBe(false);
 
-    const extraRecordField = validDocument();
-    Object.assign(extraRecordField.stopwatchRecords[0], { unexpected: true });
-    expect(isValidSyncDocument(extraRecordField)).toBe(false);
-
     const extraTombstoneField = validDocument();
     Object.assign(extraTombstoneField.tombstones[0], { unexpected: true });
     expect(isValidSyncDocument(extraTombstoneField)).toBe(false);
   });
 
   it('rejects blank IDs in every entity and tombstones', () => {
-    const blankRecordId = validDocument();
-    blankRecordId.stopwatchRecords[0].id = '   ';
-    expect(isValidSyncDocument(blankRecordId)).toBe(false);
-
     const blankHistoryId = validDocument();
     blankHistoryId.resultHistory[0].id = '\t ';
     expect(isValidSyncDocument(blankHistoryId)).toBe(false);
@@ -61,10 +62,6 @@ describe('cloud sync document validation', () => {
   });
 
   it('rejects IDs longer than the supported limit', () => {
-    const record = validDocument();
-    record.stopwatchRecords[0].id = 'x'.repeat(201);
-    expect(isValidSyncDocument(record)).toBe(false);
-
     const history = validDocument();
     history.resultHistory[0].id = 'x'.repeat(201);
     expect(isValidSyncDocument(history)).toBe(false);
@@ -88,7 +85,6 @@ describe('cloud sync document validation', () => {
   it('accepts IDs at the maximum supported length', () => {
     const document = validDocument();
     const maxId = 'x'.repeat(200);
-    document.stopwatchRecords[0].id = maxId;
     document.resultHistory[0].id = maxId;
     document.favorites[0].id = maxId;
     document.tombstones[0].id = 'y'.repeat(200);
@@ -97,15 +93,6 @@ describe('cloud sync document validation', () => {
   });
 
   it('rejects malformed timestamps and unsupported settings', () => {
-    const badTimestamp = validDocument();
-    badTimestamp.stopwatchRecords[0].durationMs = -1;
-    expect(isValidSyncDocument(badTimestamp)).toBe(false);
-
-    const reversedTimestamps = validDocument();
-    reversedTimestamps.stopwatchRecords[0].startedAt = 300;
-    reversedTimestamps.stopwatchRecords[0].endedAt = 200;
-    expect(isValidSyncDocument(reversedTimestamps)).toBe(false);
-
     const badSettings = validDocument();
     Object.assign(badSettings.settings, { token: 'unexpected' });
     expect(isValidSyncDocument(badSettings)).toBe(false);
@@ -121,12 +108,6 @@ describe('cloud sync document validation', () => {
     expect(isValidSyncDocument(badUrl)).toBe(false);
   });
   it('rejects live records that conflict with a deletion tombstone', () => {
-    const recordConflict = validDocument();
-    recordConflict.tombstones.push({
-      key: 'stopwatchRecords:record-1', entity: 'stopwatchRecords', id: 'record-1', deletedAt: 300,
-    });
-    expect(isValidSyncDocument(recordConflict)).toBe(false);
-
     const historyConflict = validDocument();
     historyConflict.tombstones.push({
       key: 'resultHistory:history-1', entity: 'resultHistory', id: 'history-1', deletedAt: 300,
@@ -141,10 +122,6 @@ describe('cloud sync document validation', () => {
   });
 
   it('rejects duplicate IDs and URLs that could overwrite unrelated local data', () => {
-    const duplicateRecord = validDocument();
-    duplicateRecord.stopwatchRecords.push({ ...duplicateRecord.stopwatchRecords[0] });
-    expect(isValidSyncDocument(duplicateRecord)).toBe(false);
-
     const duplicateHistoryUrl = validDocument();
     duplicateHistoryUrl.resultHistory.push({
       ...duplicateHistoryUrl.resultHistory[0], id: 'history-2',
