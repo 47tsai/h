@@ -3,7 +3,7 @@
 ## 目前流程
 
 1. 使用者在設定頁手動按下同步，不會背景自動同步。
-2. 前端從 IndexedDB 讀取碼表紀錄、歷史紀錄、收藏、刪除標記與主題設定。
+2. 前端從 IndexedDB 讀取歷史紀錄、收藏、刪除標記與主題設定。
 3. 前端將資料送至設定好的 Cloudflare Worker `/api/sync`。
 4. Worker 檢查 Origin、請求方法、JSON 格式、大小、允許欄位、資料結構與請求頻率；遇到未知欄位、重複 ID／URL 或資料與同 ID 刪除標記衝突時會拒絕同步。
 5. Worker 從固定設定的 GitHub 儲存庫讀取 `data/sync.json`，合併資料後使用檔案 SHA 寫回。
@@ -12,16 +12,15 @@
 
 ## 同步資料
 
-文件格式為 `schemaVersion: 1`，包含：
+文件格式為 `schemaVersion: 2`，包含：
 
-- `stopwatchRecords`
 - `resultHistory`
 - `favorites`
 - `tombstones`
 - `settings.theme`
 - `updatedAt`
 
-每種資料以 ID 合併。碼表紀錄以建立時間比較，歷史紀錄以最後操作時間比較，收藏以更新時間比較。歷史與收藏會再按 URL 去重。刪除標記會保留，並優先排除相同項目。
+每種資料以 ID 合併。歷史紀錄以最後操作時間比較，收藏以更新時間比較。歷史與收藏會再按 URL 去重。刪除標記會保留，並優先排除相同項目。
 
 ## 設定位置
 

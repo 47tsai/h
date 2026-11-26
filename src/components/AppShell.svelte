@@ -1,49 +1,33 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import {
-    formatDuration,
-    getElapsedMs,
-    isRunningState,
-    localDateKey,
-    type RunningState,
-  } from '../lib/stopwatch';
-  import {
     deleteFavorite,
     deleteResultHistory,
-    deleteStopwatchRecord,
     clearAllSyncableData,
     importBackupData,
     listFavorites,
     listResultHistory,
-    listStopwatchRecords,
     recordResultAction,
     saveFavorite,
-    saveStopwatchRecord,
     type FavoriteItem,
     type ResultHistoryItem,
-    type StopwatchRecord,
   } from '../lib/storage';
   import Icon from './Icon.svelte';
   import { syncWithCloud } from '../lib/sync';
   import { buildConversionResults, converterSources, sourceForUrl } from '../lib/converter-sources';
   import { validateBackupData } from '../lib/backup';
 
-  type Section = 'converter' | 'history' | 'favorites' | 'stopwatch' | 'settings';
+  type Section = 'converter' | 'history' | 'favorites' | 'settings';
   type Theme = 'dark' | 'light' | 'system';
   const navigation: { id: Section; label: string; icon: string; hint: string }[] = [
     { id: 'converter', label: '編號轉換', icon: 'arrow-up-right', hint: 'Converter' },
     { id: 'history', label: '歷史紀錄', icon: 'history', hint: 'History' },
     { id: 'favorites', label: '我的收藏', icon: 'star', hint: 'Favorites' },
-    { id: 'stopwatch', label: '碼錶', icon: 'timer', hint: 'Stopwatch' },
     { id: 'settings', label: '設定', icon: 'settings', hint: 'Settings' },
   ];
 
   let activeSection: Section = 'converter';
   let theme: Theme = 'system';
-  let now = Date.now();
-  let tick: ReturnType<typeof setInterval> | undefined;
-  let runningState: RunningState | null = null;
-  let records: StopwatchRecord[] = [];
   let resultHistory: ResultHistoryItem[] = [];
   let favorites: FavoriteItem[] = [];
   let favoriteTitle = '';
@@ -54,8 +38,6 @@
   let editingFavoriteId: string | null = null;
   let storageError = '';
   let notice = '';
-  let recordQuery = '';
-  let recordSort: 'newest' | 'oldest' | 'longest' | 'shortest' = 'newest';
   let resultQuery = '';
   let resultSort: 'newest' | 'oldest' = 'newest';
   let converterInput = '';
@@ -137,17 +119,6 @@
     }
   }
 
-  $: elapsedMs = getElapsedMs(runningState, now);
-  $: filteredRecords = records
-    .filter((record) => record.title.toLocaleLowerCase().includes(recordQuery.toLocaleLowerCase()))
-    .sort((a, b) => recordSort === 'oldest' ? a.endedAt - b.endedAt
-      : recordSort === 'longest' ? b.durationMs - a.durationMs
-      : recordSort === 'shortest' ? a.durationMs - b.durationMs
-      : b.endedAt - a.endedAt);
-  $: todayKey = localDateKey(now);
-  $: todayRecords = records.filter((record) => localDateKey(record.endedAt) === todayKey);
-  $: todayDurationMs = todayRecords.reduce((total, record) => total + record.durationMs, 0);
-  $: totalDurationMs = records.reduce((total, record) => total + record.durationMs, 0);
   $: normalizedResultQuery = resultQuery.toLocaleLowerCase();
   $: filteredResultHistory = resultHistory
     .filter((item) =>
@@ -172,7 +143,6 @@
         : b.createdAt - a.createdAt,
     );
   $: favoriteGroups = groupFavorites(filteredFavorites);
-  $: elapsedLabel = formatDuration(elapsedMs);
 
   function favoriteSourceLabel(item: FavoriteItem): string {
     return item.source && converterSources[item.source] ? converterSources[item.source].label : sourceForUrl(item.url).label;
@@ -247,89 +217,6 @@
     catch (error) { storageError = error instanceof Error ? error.message : '刪除歷史紀錄失敗。'; }
   }
   function actionLabel(action: ResultHistoryItem['lastAction']): string { return action === 'open' ? '開啟' : action === 'copy' ? '複製' : '分享'; }
-
-  function makeTitle(timestamp: number): string {
-    const date = new Intl.DateTimeFormat('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp));
-    const time = new Intl.DateTimeFormat('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date(timestamp));
-    return date + ' ' + time;
-  }
-
-  function persistRunningState() {
-    try {
-      if (runningState) localStorage.setItem('h-tools-stopwatch-active', JSON.stringify(runningState));
-      else localStorage.removeItem('h-tools-stopwatch-active');
-    } catch {
-      storageError = '瀏覽器無法保存碼錶狀態，重新整理後可能無法恢復。';
-    }
-  }
-
-  function startStopwatchTick() {
-    if (tick) return;
-    tick = setInterval(() => { now = Date.now(); }, 1000);
-  }
-
-  function stopStopwatchTick() {
-    if (tick) clearInterval(tick);
-    tick = undefined;
-    now = Date.now();
-  }
-
-  function startStopwatch() {
-    const startedAt = Date.now();
-    runningState = { sessionStartedAt: startedAt, startedAt, accumulatedMs: 0, running: true };
-    persistRunningState();
-    startStopwatchTick();
-    notice = '';
-  }
-
-  function pauseStopwatch() {
-    if (!runningState || !runningState.running) return;
-    runningState = { ...runningState, accumulatedMs: getElapsedMs(runningState, Date.now()), running: false };
-    persistRunningState();
-    stopStopwatchTick();
-  }
-
-  function resumeStopwatch() {
-    if (!runningState || runningState.running) return;
-    runningState = { ...runningState, startedAt: Date.now(), running: true };
-    persistRunningState();
-    startStopwatchTick();
-  }
-
-  async function stopStopwatch() {
-    if (!runningState) return;
-    const endedAt = Date.now();
-    const durationMs = runningState.accumulatedMs + (runningState.running ? Math.max(0, endedAt - runningState.startedAt) : 0);
-    const record: StopwatchRecord = {
-      id: crypto.randomUUID(),
-      startedAt: runningState.sessionStartedAt,
-      endedAt,
-      durationMs,
-      title: makeTitle(runningState.sessionStartedAt),
-      createdAt: endedAt,
-    };
-    try {
-      await saveStopwatchRecord(record);
-      records = await listStopwatchRecords();
-      runningState = null;
-      persistRunningState();
-      stopStopwatchTick();
-      notice = '碼錶紀錄已儲存在這台裝置。';
-      storageError = '';
-    } catch (error) {
-      storageError = error instanceof Error ? error.message : '保存紀錄失敗。';
-    }
-  }
-
-  async function removeRecord(id: string) {
-    try {
-      await deleteStopwatchRecord(id);
-      records = await listStopwatchRecords();
-      notice = '已刪除這筆紀錄。';
-    } catch (error) {
-      storageError = error instanceof Error ? error.message : '刪除紀錄失敗。';
-    }
-  }
 
   async function addFavorite() {
     storageError = '';
@@ -435,10 +322,9 @@
       const result = await syncWithCloud(syncWorkerUrl, theme);
       lastSyncedAt = result.syncedAt;
       try { localStorage.setItem('h-tools-last-synced-at', result.syncedAt); } catch { /* Status remains available for this session. */ }
-      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
-        listStopwatchRecords(), listResultHistory(), listFavorites(),
+      const [savedHistory, savedFavorites] = await Promise.all([
+        listResultHistory(), listFavorites(),
       ]);
-      records = savedRecords;
       resultHistory = savedHistory;
       favorites = savedFavorites;
       const remoteTheme = result.document.settings?.theme;
@@ -455,18 +341,16 @@
     dataBusy = true;
     storageError = '';
     try {
-      const [savedRecords, savedHistory, savedFavorites] = await Promise.all([
-        listStopwatchRecords(), listResultHistory(), listFavorites(),
+      const [savedHistory, savedFavorites] = await Promise.all([
+        listResultHistory(), listFavorites(),
       ]);
-      records = savedRecords;
       resultHistory = savedHistory;
       favorites = savedFavorites;
       const backup = {
         format: 'h-tools-backup',
-        schemaVersion: 1,
+        schemaVersion: 2,
         exportedAt: new Date().toISOString(),
         settings: { theme },
-        stopwatchRecords: savedRecords,
         resultHistory: savedHistory,
         favorites: savedFavorites,
       };
@@ -497,15 +381,13 @@
       if (file.size > MAX_BACKUP_BYTES) throw new Error('備份檔超過 10 MB，無法匯入。');
       const parsed: unknown = JSON.parse(await file.text());
       const backup = validateBackupData(parsed);
-      const { stopwatchRecords: importedRecords, resultHistory: importedHistory, favorites: importedFavorites } = backup;
-      if (!window.confirm(`即將合併備份資料：${importedRecords.length} 筆碼錶、${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
+      const { resultHistory: importedHistory, favorites: importedFavorites } = backup;
+      if (!window.confirm(`即將合併備份資料：${importedHistory.length} 筆歷史、${importedFavorites.length} 筆收藏。現有資料不會整批清除，同 ID 或同網址的項目可能更新。要繼續嗎？`)) return;
 
       await importBackupData(
-        importedRecords as StopwatchRecord[],
         importedHistory as ResultHistoryItem[],
         importedFavorites as FavoriteItem[],
       );
-      records = await listStopwatchRecords();
       resultHistory = await listResultHistory();
       favorites = await listFavorites();
       const importedTheme = (backup.settings as { theme?: unknown } | undefined)?.theme;
@@ -520,21 +402,16 @@
   }
 
   async function clearAllLocalData() {
-    if (!window.confirm('確定刪除此裝置上的所有碼錶紀錄、歷史紀錄、收藏與進行中的碼錶狀態？此操作無法復原，請先匯出備份。')) return;
+    if (!window.confirm('確定刪除此裝置上的所有歷史紀錄與收藏？此操作無法復原，請先匯出備份。')) return;
     dataBusy = true;
     storageError = '';
     try {
       await clearAllSyncableData();
-      try { localStorage.removeItem('h-tools-stopwatch-active'); } catch { /* IndexedDB data was still deleted. */ }
-      runningState = null;
-      stopStopwatchTick();
-      records = [];
       resultHistory = [];
       favorites = [];
       notice = '已清除本機資料，介面主題設定仍保留。';
     } catch (error) {
       storageError = error instanceof Error ? error.message : '清除資料失敗，請重新載入後檢查資料狀態。';
-      records = await listStopwatchRecords().catch(() => records);
       resultHistory = await listResultHistory().catch(() => resultHistory);
       favorites = await listFavorites().catch(() => favorites);
     } finally {
@@ -546,21 +423,6 @@
   onMount(() => {
     try {
       syncThemeFromChi();
-      const active = localStorage.getItem('h-tools-stopwatch-active');
-      if (active) {
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(active);
-        } catch {
-          parsed = null;
-        }
-        if (isRunningState(parsed)) {
-          runningState = parsed;
-        } else {
-          localStorage.removeItem('h-tools-stopwatch-active');
-          storageError = '已清除無效的碼錶暫存狀態，其他紀錄不受影響。';
-        }
-      }
     } catch {
       storageError = '讀取本機設定失敗，部分狀態可能已重設。';
     }
@@ -571,22 +433,11 @@
       if (mode === 'dark' || mode === 'light' || mode === 'system') theme = mode;
     };
     window.addEventListener('chi-theme-change', onChiThemeChange);
-    const refreshCalendarDate = () => { now = Date.now(); };
-    const calendarTick = window.setInterval(refreshCalendarDate, 60_000);
-    window.addEventListener('focus', refreshCalendarDate);
-    document.addEventListener('visibilitychange', refreshCalendarDate);
-    if (runningState?.running) startStopwatchTick();
-    listStopwatchRecords().then((value) => { records = value; })
-      .catch((error) => { storageError = error instanceof Error ? error.message : '讀取紀錄失敗。'; });
     listFavorites().then((value) => { favorites = value; })
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取收藏失敗。'; });
     listResultHistory().then((value) => { resultHistory = value; })
       .catch((error) => { storageError = error instanceof Error ? error.message : '讀取歷史紀錄失敗。'; });
     return () => {
-      if (tick) clearInterval(tick);
-      clearInterval(calendarTick);
-      window.removeEventListener('focus', refreshCalendarDate);
-      document.removeEventListener('visibilitychange', refreshCalendarDate);
       window.removeEventListener('chi-theme-change', onChiThemeChange);
     };
   });
@@ -599,7 +450,6 @@
 <div class="app-frame">
   <aside class="sidebar">
     <a class="brand" href="/" aria-label="Chi Tools 首頁"><span class="brand-mark"><img class="brand-logo-light" src="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-b.png" alt=""><img class="brand-logo-dark" src="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-w.png" alt=""></span><span><strong>Chi Tools</strong></span></a>
-    
     <nav aria-label="主要導覽">
       {#each navigation as item}
         <button class:active={activeSection === item.id} aria-current={activeSection === item.id ? 'page' : undefined} class="nav-item" onclick={() => { activeSection = item.id; notice = ''; }}>
@@ -617,34 +467,11 @@
   <main class="main-area">
     <header class="topbar">
       <a class="topbar-brand" href="/" aria-label="Chi Tools 首頁"><span class="brand-mark"><img class="brand-logo-light" src="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-b.png" alt=""><img class="brand-logo-dark" src="https://raw.githubusercontent.com/47tsai/chi-system/a7f018b7836afe42103b717b5379f72a244dfded/logo/h-w.png" alt=""></span><strong>Chi Tools</strong></a>
-      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span><button class="icon-button" aria-label="前往設定" title="設定" onclick={() => activeSection = 'settings'}><Icon name="settings" size={18} /></button></div>
+      <div class="topbar-actions"><span class="sync-label"><span class="status-dot"></span></span></div>
     </header>
 
     <div class="content">
-      {#if activeSection === 'stopwatch'}
-        <section class="page-heading"><h1>碼錶</h1></section>
-        <section class="stopwatch-card">
-          <div class="card-topline"><span class="live-indicator"></span><span>{runningState?.running ? '計時中' : runningState ? '已暫停' : '準備就緒'}</span></div>
-          <div class="timer-display" aria-live="off">{elapsedLabel}<span class="timer-hundredths">.{String(Math.floor((elapsedMs % 1000) / 10)).padStart(2, '0')}</span></div>
-          <div class="timer-caption">{#if runningState}{makeTitle(runningState.sessionStartedAt)}{/if}</div>
-          <div class="timer-controls">
-            {#if !runningState}
-              <button class="primary-button" onclick={startStopwatch}><Icon name="play" size={16} /> 開始計時</button>
-            {:else if runningState.running}
-              <button class="secondary-button" onclick={pauseStopwatch}><Icon name="pause" size={16} /> 暫停</button><button class="primary-button" onclick={stopStopwatch}><Icon name="square" size={15} /> 停止並儲存</button>
-            {:else}
-              <button class="secondary-button" onclick={resumeStopwatch}><Icon name="play" size={16} /> 繼續</button><button class="primary-button" onclick={stopStopwatch}><Icon name="square" size={15} /> 停止並儲存</button>
-            {/if}
-          </div>
-          
-        </section>
-        <section class="history-stats" aria-label="碼錶統計"><article class="history-stat"><span>今天完成</span><strong>{todayRecords.length}</strong></article><article class="history-stat"><span>今日累計</span><strong>{formatDuration(todayDurationMs)}</strong></article><article class="history-stat"><span>總計時長</span><strong>{formatDuration(totalDurationMs)}</strong></article></section>
-        <section class="records-section full-records"><div class="section-heading"><h2>計時紀錄</h2><span class="count-pill">{records.length} 筆</span></div>
-          <div class="history-toolbar"><label class="search-field"><span><Icon name="search" size={17} /></span><input bind:value={recordQuery} placeholder="搜尋計時紀錄…" aria-label="搜尋計時紀錄" /></label><label class="sort-field">排序<select bind:value={recordSort} aria-label="計時紀錄排序"><option value="newest">最新優先</option><option value="oldest">最舊優先</option><option value="longest">時間最長</option><option value="shortest">時間最短</option></select></label></div>
-          {#if filteredRecords.length === 0}<div class="record-list empty-state"><div class="empty-icon"><Icon name="history" size={24} /></div><strong>{records.length ? '沒有符合的紀錄' : '尚無計時紀錄'}</strong><span>{records.length ? '試試其他關鍵字' : '停止並儲存碼錶後，紀錄會顯示在這裡'}</span></div>
-          {:else}<div class="record-list">{#each filteredRecords as record (record.id)}<article class="record-row"><div class="record-symbol"><Icon name="timer" size={20} /></div><div class="record-info"><strong>{record.title}</strong><small>開始 {new Date(record.startedAt).toLocaleString('zh-TW', { hour12: false })} · 結束 {new Date(record.endedAt).toLocaleString('zh-TW', { hour12: false })}</small></div><div class="record-duration">{formatDuration(record.durationMs)}</div><button class="delete-button" aria-label={'刪除 ' + record.title} title="刪除紀錄" onclick={() => removeRecord(record.id)}><Icon name="trash" size={16} /></button></article>{/each}</div>{/if}
-        </section>
-      {:else if activeSection === 'settings'}
+      {#if activeSection === 'settings'}
         <section class="page-heading"><div><h1>設定</h1></div></section>
         <section class="settings-card">
           <div class="settings-section-heading"><h2>外觀</h2></div>
@@ -652,7 +479,7 @@
         </section>
         <section class="settings-card settings-data-card">
           <div class="settings-section-heading"><h2>資料管理</h2></div>
-          <div class="settings-data-stats"><div><strong>{records.length}</strong><span>碼錶紀錄</span></div><div><strong>{resultHistory.length}</strong><span>歷史紀錄</span></div><div><strong>{favorites.length}</strong><span>收藏</span></div></div>
+          <div class="settings-data-stats"><div><strong>{resultHistory.length}</strong><span>歷史紀錄</span></div><div><strong>{favorites.length}</strong><span>收藏</span></div></div>
           <div class="setting-row"><div><strong>匯出備份</strong></div><button class="secondary-button" disabled={dataBusy} onclick={() => void exportBackup()}><Icon name="external-link" size={15} /> 匯出 JSON</button></div>
           <div class="setting-row"><div><strong>匯入備份</strong></div><div class="setting-action"><input bind:this={importFileInput} class="visually-hidden-file" type="file" accept="application/json,.json" aria-label="選擇 Chi Tools 備份檔" onchange={importBackup} /><button class="secondary-button" disabled={dataBusy} onclick={() => importFileInput?.click()}><Icon name="paste" size={15} /> 選擇備份檔</button></div></div>
           <div class="setting-row"><div><strong>清除本機資料</strong></div><button class="danger-button" disabled={dataBusy} onclick={() => void clearAllLocalData()}><Icon name="trash" size={15} /> 清除資料</button></div>
@@ -698,7 +525,6 @@
                 {#if converterSite !== 'M' && converterSite !== 'J'}<button class="converter-icon-button" aria-label="隨機編號" title="隨機編號" onclick={randomConverter}><Icon name="shuffle" size={18} /></button>{/if}
               </div>
             </div>
-            
           </div>
           <div class="converter-output-card">
             <div class="converter-output-label">轉換結果</div>
@@ -749,7 +575,6 @@
 
       {#if storageError}<div class="toast error" role="alert">{storageError}<button aria-label="關閉錯誤訊息" onclick={() => storageError = ''}><Icon name="x" size={16} /></button></div>{/if}
       {#if notice}<div class="toast" role="status">{notice}<button aria-label="關閉通知" onclick={() => notice = ''}><Icon name="x" size={16} /></button></div>{/if}
-      
     </div>
   </main>
 </div>
@@ -774,22 +599,17 @@
   .nav-item:hover { background:var(--panel); color:var(--text); }.nav-item.active { color:var(--text); background:var(--panel-2); border-color:var(--line); }
   .nav-icon { width:20px; text-align:center; font-size:18px; line-height:1; }.nav-dot { width:5px; height:5px; border-radius:50%; background:var(--accent-strong); margin-left:auto; }
   .sidebar-bottom { margin-top:auto; }.local-status { display:flex; align-items:center; gap:10px; border:1px solid var(--line); background:var(--panel); padding:12px; border-radius:11px; }
-  .status-dot,.live-indicator { width:7px; height:7px; flex:0 0 7px; background:var(--chi-color-success); border-radius:50%; box-shadow:0 0 0 4px color-mix(in srgb, var(--chi-color-success) 8%, transparent); }
+  .status-dot { width:7px; height:7px; flex:0 0 7px; background:var(--chi-color-success); border-radius:50%; box-shadow:0 0 0 4px color-mix(in srgb, var(--chi-color-success) 8%, transparent); }
   .local-status strong { display:block; font-size:11px; font-weight:600; }.local-status small { display:block; margin-top:3px; font-size:10px; color:var(--muted); }
   .sidebar-foot { color:var(--muted); font-size:9px; letter-spacing:.14em; padding:20px 10px 0; }.sidebar-foot span { padding:0 4px; color:var(--line); }
   .main-area { min-width:0; flex:1; }.topbar { box-sizing:border-box; min-height:70px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; padding:0 clamp(20px,4vw,54px); }
   .breadcrumb { display:flex; align-items:center; gap:11px; font-size:11px; color:var(--muted); }.breadcrumb .slash { color:var(--line); }.breadcrumb strong { color:var(--text); font-weight:500; }
   .topbar-actions { display:flex; align-items:center; gap:17px; }.sync-label { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; }.sync-label .status-dot { width:6px; height:6px; flex-basis:6px; }
-  .icon-button { width:33px; height:33px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--muted); cursor:pointer; }
   .content { width:min(100%,1050px); margin:0 auto; padding:42px clamp(20px,4vw,54px) 22px; }.page-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:28px; }
   .eyebrow { font-size:9px; color:var(--accent); letter-spacing:.19em; font-weight:700; margin-bottom:10px; }h1 { font-size:clamp(25px,3vw,32px); letter-spacing:-.04em; margin:0; line-height:1.2; font-weight:650; }
   .page-heading p { color:var(--muted); font-size:12px; margin:10px 0 0; line-height:1.7; }.heading-chip { display:flex; align-items:center; gap:8px; padding:8px 11px; border:1px solid var(--line); border-radius:999px; color:var(--muted); font-size:10px; white-space:nowrap; }.pulse { width:6px; height:6px; background:var(--chi-color-success); border-radius:50%; }
-  .stopwatch-card { overflow:hidden; border:1px solid var(--chi-color-border-subtle); border-radius:var(--chi-radius-xl); padding:23px 26px 19px; background:radial-gradient(ellipse at 50% -30%,color-mix(in srgb, var(--chi-color-accent) 14%, transparent) 0%,transparent 60%),linear-gradient(135deg,var(--chi-color-surface-raised),var(--chi-color-surface)); box-shadow:var(--chi-shadow-raised); }
-  .card-topline { display:flex; align-items:center; gap:9px; font-size:9px; letter-spacing:.13em; color:var(--chi-color-text-muted); }.live-indicator { width:6px; height:6px; flex-basis:6px; }.card-topline-right { margin-left:auto; font-size:8px; color:var(--chi-color-text-muted); }
-  .timer-display { display:flex; justify-content:center; align-items:baseline; margin:44px 0 7px; font-size:clamp(48px,8vw,79px); font-variant-numeric:tabular-nums; letter-spacing:-.065em; line-height:1; font-weight:450; color:var(--text); }.timer-hundredths { font-size:.36em; color:var(--accent); letter-spacing:-.02em; margin-left:3px; }.timer-caption { text-align:center; font-size:10px; color:var(--muted); min-height:16px; }
-  .timer-controls { display:flex; justify-content:center; gap:10px; margin:29px 0 25px; }.primary-button,.secondary-button { border-radius:9px; padding:11px 17px; border:1px solid transparent; cursor:pointer; font-size:11px; font-weight:650; transition:transform .15s,filter .15s; }.primary-button:hover,.secondary-button:hover { filter:brightness(1.08); transform:translateY(-1px); }
+  .primary-button,.secondary-button { border-radius:9px; padding:11px 17px; border:1px solid transparent; cursor:pointer; font-size:11px; font-weight:650; transition:transform .15s,filter .15s; }.primary-button:hover,.secondary-button:hover { filter:brightness(1.08); transform:translateY(-1px); }
   .primary-button { background:var(--chi-button-primary-background); color:var(--chi-button-primary-text); }.secondary-button { background:var(--chi-button-secondary-background); border-color:var(--chi-color-border-strong); color:var(--chi-button-secondary-text); }
-  .card-footnote { display:flex; justify-content:center; align-items:center; gap:7px; padding-top:15px; border-top:1px solid var(--chi-color-border-subtle); color:var(--chi-color-text-muted); font-size:9px; }.card-footnote span { color:var(--accent); font-size:13px; }
   .records-section { margin-top:32px; }.section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }.section-heading h2 { font-size:15px; margin:0; }.section-heading p { font-size:10px; color:var(--muted); margin:6px 0 0; }.count-pill { border:1px solid var(--line); border-radius:7px; padding:5px 8px; font-size:10px; color:var(--muted); }
   .record-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.record-row { display:flex; align-items:center; gap:13px; min-height:70px; padding:12px 16px; border-bottom:1px solid var(--line); }.record-row:last-child { border-bottom:0; }
   .record-symbol { display:grid; place-items:center; width:34px; height:34px; flex:0 0 34px; border:1px solid var(--line); border-radius:10px; color:var(--accent); background:var(--panel-2); font-size:17px; }.record-info { min-width:0; flex:1; }.record-info strong { display:block; font-size:11px; font-weight:600; overflow-wrap:anywhere; }.record-info small { display:block; margin-top:5px; font-size:9px; color:var(--muted); }
@@ -797,7 +617,7 @@
   .empty-state { min-height:164px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:8px; text-align:center; padding:25px 15px; }.empty-icon { width:38px; height:38px; display:grid; place-items:center; border:1px solid var(--line); border-radius:12px; color:var(--accent); background:var(--panel-2); font-size:20px; margin-bottom:3px; }.empty-state strong { font-size:11px; font-weight:600; }.empty-state span { font-size:10px; color:var(--muted); line-height:1.6; }
   .text-button { display:block; width:100%; padding:13px; border:0; background:transparent; color:var(--accent); cursor:pointer; font-size:10px; } .favorite-editor { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:20px; }.editor-heading { display:flex; align-items:center; gap:12px; }.editor-heading .placeholder-icon { flex:0 0 40px; width:40px; height:40px; margin:0; }.editor-heading h2 { margin:0; font-size:13px; }.editor-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.6; }.favorite-form { display:grid; grid-template-columns:1.4fr 1fr 1fr auto; gap:11px; align-items:end; margin-top:18px; }.favorite-form label { display:grid; gap:7px; color:var(--muted); font-size:10px; }.favorite-form input { min-width:0; width:100%; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--bg); color:var(--text); font-size:10px; outline:none; }.favorite-form input:focus { border-color:var(--accent-strong); }.favorite-form .primary-button { white-space:nowrap; padding:11px 12px; }.favorite-group { margin-bottom:22px; }.favorite-group .section-heading { margin:18px 0 10px; }.favorite-list { border:1px solid var(--line); border-radius:13px; overflow:hidden; background:var(--panel); }.favorite-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); }.favorite-row:last-child { border-bottom:0; }.favorite-row .record-info { overflow:hidden; }.favorite-row .record-info a { display:block; margin-top:5px; font-size:10px; color:var(--accent); text-decoration:none; overflow-wrap:anywhere; }.favorite-row .record-info a:hover { text-decoration:underline; }.favorite-row .record-info small { overflow-wrap:anywhere; }.open-favorite { display:grid; place-items:center; width:29px; height:29px; flex:0 0 29px; border:1px solid var(--line); border-radius:8px; color:var(--accent); text-decoration:none; }.settings-card { border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:0 22px; margin-bottom:16px; }
   .settings-section-heading { display:flex; align-items:center; gap:12px; padding:16px 0 14px; border-bottom:1px solid var(--line); }.settings-section-heading > div:nth-child(2) { flex:1; min-width:0; }.settings-section-heading h2 { margin:0; font-size:13px; font-weight:650; }.settings-section-heading p { margin:6px 0 0; color:var(--muted); font-size:10px; line-height:1.7; }.settings-section-icon { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); color:var(--accent); }
-  .settings-data-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding:16px 0 4px; }.settings-data-stats > div { display:flex; flex-direction:column; gap:5px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }.settings-data-stats strong { font-size:20px; font-variant-numeric:tabular-nums; }.settings-data-stats span { color:var(--muted); font-size:10px; }
+  .settings-data-stats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:16px 0 4px; }.settings-data-stats > div { display:flex; flex-direction:column; gap:5px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }.settings-data-stats strong { font-size:20px; font-variant-numeric:tabular-nums; }.settings-data-stats span { color:var(--muted); font-size:10px; }
   .setting-action { display:flex; align-items:center; gap:8px; }.visually-hidden-file { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }.danger-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 12px; border:1px solid color-mix(in srgb, var(--chi-color-danger) 55%, transparent); border-radius:9px; color:var(--chi-color-danger); background:color-mix(in srgb, var(--chi-color-danger) 8%, transparent); font-size:10px; cursor:pointer; white-space:nowrap; }.danger-button:hover:not(:disabled) { background:color-mix(in srgb, var(--chi-color-danger) 18%, transparent); border-color:color-mix(in srgb, var(--chi-color-danger) 88%, transparent); }.danger-button:disabled { opacity:.45; cursor:not-allowed; }.setting-row .secondary-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; white-space:nowrap; }
   .sync-explainer { display:flex; gap:12px; align-items:flex-start; padding:18px 0 4px; }.sync-status-icon { display:grid; place-items:center; width:36px; height:36px; flex:0 0 36px; border:1px solid var(--line); border-radius:11px; background:var(--panel-2); color:var(--muted); }.sync-explainer strong { font-size:11px; }.sync-explainer p { margin:6px 0 0; max-width:640px; color:var(--muted); font-size:10px; line-height:1.8; }
   .settings-sync-card .settings-section-heading { border-bottom:0; }.settings-sync-card .setting-row { margin-top:8px; }
@@ -806,11 +626,6 @@
   .setting-row { display:flex; justify-content:space-between; align-items:center; gap:20px; padding:16px 0; border-bottom:1px solid var(--line); }.setting-row:last-child { border-bottom:0; }.setting-row strong { font-size:12px; }.setting-row p { margin:7px 0 0; max-width:470px; font-size:10px; color:var(--muted); line-height:1.7; }
   .theme-options { display:flex; padding:3px; gap:2px; border:1px solid var(--line); border-radius:9px; background:var(--bg); flex-shrink:0; }.theme-option { padding:7px 10px; border:0; background:transparent; color:var(--muted); border-radius:6px; cursor:pointer; font-size:10px; }.theme-option.selected { background:var(--panel-2); color:var(--text); box-shadow:0 0 0 1px var(--line); }
   .setting-badge { border:1px solid color-mix(in srgb, var(--chi-color-success) 32%, transparent); color:var(--chi-color-success); background:color-mix(in srgb, var(--chi-color-success) 8%, transparent); border-radius:6px; padding:6px 8px; white-space:nowrap; font-size:8px; letter-spacing:.08em; }.setting-badge.muted { color:var(--muted); border-color:var(--line); background:transparent; letter-spacing:0; }
-  .history-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-bottom:20px; }
-  .history-stat { min-width:0; padding:17px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
-  .history-stat span,.history-stat small { display:block; color:var(--muted); font-size:10px; }
-  .history-stat strong { display:block; margin:11px 0 6px; font-size:clamp(17px,2vw,23px); font-weight:600; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-  .history-stat small { font-size:9px; }
   .history-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:13px; }
   .history-toolbar .search-field { flex:1; margin:0; }
   .sort-field { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:10px; white-space:nowrap; }
@@ -821,12 +636,12 @@
   .toast { position:sticky; bottom:14px; margin:16px auto 0; width:fit-content; max-width:100%; padding:11px 15px; border:1px solid color-mix(in srgb, var(--chi-color-success) 27%, transparent); background:var(--panel); border-radius:10px; box-shadow:var(--chi-shadow-raised); color:var(--text); font-size:10px; z-index:2; }.toast.error { border-color:color-mix(in srgb, var(--chi-color-danger) 55%, transparent); color:var(--chi-color-danger); }.toast button { margin-left:15px; background:transparent; border:0; color:var(--muted); cursor:pointer; font-size:15px; }
   .page-footer { display:flex; justify-content:space-between; gap:15px; color:var(--chi-color-text-muted); font-size:8px; letter-spacing:.07em; margin-top:39px; }
   @media (max-width:760px) {
-    .delete-button,.edit-favorite,.open-favorite,.converter-icon-button,.icon-button { min-width:40px; min-height:40px; }
+    .delete-button,.edit-favorite,.open-favorite,.converter-icon-button { min-width:40px; min-height:40px; }
     .app-frame { box-sizing:border-box; display:block; min-height:100vh; min-height:100dvh; padding-bottom:calc(75px + env(safe-area-inset-bottom)); }.sidebar { position:fixed; z-index:5; bottom:0; left:0; right:0; width:auto; height:calc(66px + env(safe-area-inset-bottom)); padding:5px 7px max(5px,env(safe-area-inset-bottom)); border-right:0; border-top:1px solid var(--line); background:var(--panel); }.brand,.nav-label,.sidebar-bottom { display:none; }
-    nav { height:100%; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
+    nav { height:100%; display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; }.nav-item { position:relative; justify-content:center; align-items:center; flex-direction:column; gap:4px; padding:6px 1px; font-size:9px; border-radius:8px; }.nav-icon { font-size:17px; }.nav-dot { position:absolute; top:4px; right:calc(50% - 16px); width:4px; height:4px; }
     .topbar { box-sizing:border-box; height:auto; min-height:calc(55px + env(safe-area-inset-top, 0px)); padding:env(safe-area-inset-top, 0px) 18px 0; }.topbar-brand { display:flex; align-items:center; min-height:55px; }.topbar-actions { align-self:center; gap:11px; }.sync-label { font-size:0; gap:0; }.sync-label .status-dot { width:7px; height:7px; }.content { padding:29px 17px 20px; }.page-heading { margin-bottom:22px; }.heading-chip { font-size:9px; padding:7px 9px; }
-    .stopwatch-card { padding:19px 15px 16px; border-radius:13px; }.timer-display { margin-top:42px; font-size:clamp(43px,12vw,65px); }.timer-controls { margin:27px 0 23px; }.primary-button,.secondary-button { padding:11px 13px; }.card-footnote { font-size:8px; text-align:center; }
-    .records-section { margin-top:26px; }.history-stats { grid-template-columns:1fr; gap:8px; }.history-stat { display:grid; grid-template-columns:1fr auto; align-items:center; gap:4px 12px; padding:12px; }.history-stat strong { grid-column:2; grid-row:1 / span 2; margin:0; font-size:18px; }.history-stat small { grid-column:1; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.settings-data-stats { gap:6px; }.settings-data-stats > div { padding:9px 7px; }.settings-data-stats strong { font-size:17px; }.settings-section-heading { align-items:flex-start; flex-wrap:wrap; }.settings-section-heading > .setting-badge { margin-left:48px; }.setting-action,.setting-row .secondary-button,.danger-button { max-width:100%; }.sync-explainer { gap:9px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
+    .primary-button,.secondary-button { padding:11px 13px; }
+    .records-section { margin-top:26px; }.history-toolbar { align-items:stretch; flex-direction:column; }.sort-field { justify-content:space-between; }.record-row { gap:9px; padding:11px; }.record-symbol { width:30px; height:30px; flex-basis:30px; }.record-duration { font-size:10px; }.setting-row { align-items:flex-start; flex-direction:column; gap:13px; }.settings-card { padding:0 16px; }.settings-data-stats { gap:6px; }.settings-data-stats > div { padding:9px 7px; }.settings-data-stats strong { font-size:17px; }.settings-section-heading { align-items:flex-start; flex-wrap:wrap; }.settings-section-heading > .setting-badge { margin-left:48px; }.setting-action,.setting-row .secondary-button,.danger-button { max-width:100%; }.sync-explainer { gap:9px; }.favorite-form { grid-template-columns:1fr; }.favorite-form .primary-button { width:100%; }.favorite-editor { padding:15px; }.favorite-row { gap:8px; padding:11px; }.favorite-row .record-info { min-width:0; }.page-footer { margin-top:28px; font-size:7px; }
   }
   :global(button:focus-visible), :global(a:focus-visible), :global(input:focus-visible), :global(select:focus-visible), :global(textarea:focus-visible) { outline:2px solid var(--accent-strong); outline-offset:3px; }
   @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }

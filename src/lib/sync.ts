@@ -2,19 +2,16 @@ import {
   applySyncSnapshotIfUnchanged,
   listFavorites,
   listResultHistory,
-  listStopwatchRecords,
   listSyncTombstones,
   type FavoriteItem,
   type ResultHistoryItem,
-  type StopwatchRecord,
   type SyncTombstone,
 } from './storage';
 
 export interface SyncDocument {
-  schemaVersion: 1;
+  schemaVersion: 2;
   updatedAt: string;
   settings: { theme?: 'system' | 'light' | 'dark' };
-  stopwatchRecords: StopwatchRecord[];
   resultHistory: ResultHistoryItem[];
   favorites: FavoriteItem[];
   tombstones: SyncTombstone[];
@@ -66,8 +63,8 @@ function hasOnlyKeys(value: Record<string, unknown>, allowed: string[]): boolean
 export function isValidSyncDocument(value: unknown): value is SyncDocument {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const document = value as Record<string, unknown>;
-  if (!hasOnlyKeys(document, ['schemaVersion', 'updatedAt', 'settings', 'stopwatchRecords', 'resultHistory', 'favorites', 'tombstones'])
-    || document.schemaVersion !== 1 || typeof document.updatedAt !== 'string'
+  if (!hasOnlyKeys(document, ['schemaVersion', 'updatedAt', 'settings', 'resultHistory', 'favorites', 'tombstones'])
+    || document.schemaVersion !== 2 || typeof document.updatedAt !== 'string'
     || !Number.isFinite(Date.parse(document.updatedAt))) return false;
 
   const settings = document.settings;
@@ -76,19 +73,9 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   if (Object.keys(settings).some((key) => key !== 'theme')
     || (theme !== undefined && !['system', 'light', 'dark'].includes(String(theme)))) return false;
 
-  if (!Array.isArray(document.stopwatchRecords) || !Array.isArray(document.resultHistory)
+  if (!Array.isArray(document.resultHistory)
     || !Array.isArray(document.favorites) || !Array.isArray(document.tombstones)) return false;
 
-  const validRecord = (value: unknown): value is StopwatchRecord => {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-    const item = value as Record<string, unknown>;
-    return hasOnlyKeys(item, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
-      && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
-      && typeof item.title === 'string' && item.title.length <= 500
-      && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
-      && item.endedAt >= item.startedAt
-      && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
-  };
   const validHistoryItem = (value: unknown): value is ResultHistoryItem => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
@@ -115,7 +102,7 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const item = value as Record<string, unknown>;
     return hasOnlyKeys(item, ['key', 'entity', 'id', 'deletedAt'])
-      && ['stopwatchRecords', 'resultHistory', 'favorites'].includes(String(item.entity))
+      && ['resultHistory', 'favorites'].includes(String(item.entity))
       && typeof item.id === 'string' && item.id.trim().length > 0 && item.id.length <= 200
       && item.key === String(item.entity) + ':' + item.id && isTimestamp(item.deletedAt);
   };
@@ -132,20 +119,16 @@ export function isValidSyncDocument(value: unknown): value is SyncDocument {
   };
   const tombstoneKeys = new Set(document.tombstones.filter(validTombstone).map((item) => item.key));
 
-  return document.stopwatchRecords.length <= 10000
-    && document.resultHistory.length <= 10000 && document.favorites.length <= 10000
+  return document.resultHistory.length <= 10000 && document.favorites.length <= 10000
     && document.tombstones.length <= 30000
-    && document.stopwatchRecords.every(validRecord)
     && document.resultHistory.every(validHistoryItem)
     && document.favorites.every(validFavorite)
     && document.tombstones.every(validTombstone)
-    && hasUniqueValues(document.stopwatchRecords, (item) => item.id)
     && hasUniqueValues(document.resultHistory, (item) => item.id)
     && hasUniqueValues(document.resultHistory, (item) => item.url)
     && hasUniqueValues(document.favorites, (item) => item.id)
     && hasUniqueValues(document.favorites, (item) => item.url)
     && hasUniqueValues(document.tombstones, (item) => item.key)
-    && document.stopwatchRecords.every((item) => !tombstoneKeys.has('stopwatchRecords:' + item.id))
     && document.resultHistory.every((item) => !tombstoneKeys.has('resultHistory:' + item.id))
     && document.favorites.every((item) => !tombstoneKeys.has('favorites:' + item.id));
 }
@@ -159,14 +142,13 @@ function validateResponse(value: unknown): value is { ok: true; document: SyncDo
 }
 
 async function createLocalDocument(theme: 'system' | 'light' | 'dark'): Promise<SyncDocument> {
-  const [stopwatchRecords, resultHistory, favorites, tombstones] = await Promise.all([
-    listStopwatchRecords(), listResultHistory(), listFavorites(), listSyncTombstones(),
+  const [resultHistory, favorites, tombstones] = await Promise.all([
+    listResultHistory(), listFavorites(), listSyncTombstones(),
   ]);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     updatedAt: new Date().toISOString(),
     settings: { theme },
-    stopwatchRecords,
     resultHistory,
     favorites,
     tombstones,

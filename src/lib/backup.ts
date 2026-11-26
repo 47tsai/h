@@ -1,7 +1,6 @@
-import type { FavoriteItem, ResultHistoryItem, StopwatchRecord } from './storage';
+import type { FavoriteItem, ResultHistoryItem } from './storage';
 
 export interface BackupData {
-  stopwatchRecords: StopwatchRecord[];
   resultHistory: ResultHistoryItem[];
   favorites: FavoriteItem[];
   settings?: { theme?: 'system' | 'light' | 'dark' };
@@ -44,26 +43,18 @@ function hasUniqueValues(items: Record<string, unknown>[], field: string): boole
 }
 
 export function validateBackupData(value: unknown): BackupData {
-  if (!isObject(value) || value.format !== 'h-tools-backup' || value.schemaVersion !== 1
+  if (!isObject(value) || value.format !== 'h-tools-backup' || value.schemaVersion !== 2
     || typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt))
-    || !hasOnlyKeys(value, ['format', 'schemaVersion', 'exportedAt', 'settings', 'stopwatchRecords', 'resultHistory', 'favorites'])) {
+    || !hasOnlyKeys(value, ['format', 'schemaVersion', 'exportedAt', 'settings', 'resultHistory', 'favorites'])) {
     throw new Error('備份檔格式不正確或版本不支援。');
   }
 
-  const records = value.stopwatchRecords;
   const history = value.resultHistory;
   const favorites = value.favorites;
-  if (!Array.isArray(records) || !Array.isArray(history) || !Array.isArray(favorites)
-    || records.length > 10000 || history.length > 10000 || favorites.length > 10000) {
+  if (!Array.isArray(history) || !Array.isArray(favorites)
+    || history.length > 10000 || favorites.length > 10000) {
     throw new Error('備份資料結構不正確，或單一類型資料超過 10,000 筆。');
   }
-
-  const validRecord = (item: unknown): item is StopwatchRecord => isObject(item)
-    && hasOnlyKeys(item, ['id', 'startedAt', 'endedAt', 'durationMs', 'title', 'createdAt'])
-    && isId(item.id) && typeof item.title === 'string' && item.title.length <= 500
-    && isTimestamp(item.startedAt) && isTimestamp(item.endedAt)
-    && item.endedAt >= item.startedAt
-    && isTimestamp(item.durationMs) && isTimestamp(item.createdAt);
 
   const validHistory = (item: unknown): item is ResultHistoryItem => isObject(item)
     && hasOnlyKeys(item, ['id', 'url', 'source', 'sourceLabel', 'lastAction', 'lastActionAt', 'createdAt'])
@@ -81,11 +72,9 @@ export function validateBackupData(value: unknown): BackupData {
     && (item.notes === undefined || (typeof item.notes === 'string' && item.notes.length <= 5000))
     && isTimestamp(item.createdAt) && isTimestamp(item.updatedAt);
 
-  const recordObjects = records.filter(isObject);
   const historyObjects = history.filter(isObject);
   const favoriteObjects = favorites.filter(isObject);
-  if (!records.every(validRecord) || !history.every(validHistory) || !favorites.every(validFavorite)
-    || !hasUniqueValues(recordObjects, 'id')
+  if (!history.every(validHistory) || !favorites.every(validFavorite)
     || !hasUniqueValues(historyObjects, 'id') || !hasUniqueValues(historyObjects, 'url')
     || !hasUniqueValues(favoriteObjects, 'id') || !hasUniqueValues(favoriteObjects, 'url')) {
     throw new Error('備份包含無效或重複的欄位、ID 或網址，未匯入任何內容。');
@@ -103,7 +92,6 @@ export function validateBackupData(value: unknown): BackupData {
 
   return {
     ...(settings ? { settings } : {}),
-    stopwatchRecords: records,
     resultHistory: history,
     favorites,
   };
