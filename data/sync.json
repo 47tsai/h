@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-16T16:53:44.243Z",
+  "updatedAt": "2026-11-26T09:53:25.058Z",
   "settings": {
     "theme": "system"
   },
@@ -28,6 +28,24 @@
       "entity": "resultHistory",
       "id": "4782253c-75b3-4728-a4a5-7b2e2d081e59",
       "deletedAt": 1791802688527
+    },
+    {
+      "key": "resultHistory:4a923481-fcc4-4d1e-8401-5f1c4fd21316",
+      "entity": "resultHistory",
+      "id": "4a923481-fcc4-4d1e-8401-5f1c4fd21316",
+      "deletedAt": 1795686790654
+    },
+    {
+      "key": "resultHistory:53e85f8a-a1b4-4737-b6f1-9db2ea9d5fb2",
+      "entity": "resultHistory",
+      "id": "53e85f8a-a1b4-4737-b6f1-9db2ea9d5fb2",
+      "deletedAt": 1795686790150
+    },
+    {
+      "key": "resultHistory:a0509816-a820-4923-85fb-ff6526074f88",
+      "entity": "resultHistory",
+      "id": "a0509816-a820-4923-85fb-ff6526074f88",
+      "deletedAt": 1795686791304
     }
   ],
   "stopwatchRecords": [
