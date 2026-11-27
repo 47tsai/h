@@ -112,6 +112,7 @@ export async function deleteResultHistory(id: string): Promise<void> {
   await tombstones.put({ key, entity: 'resultHistory', id, deletedAt: Math.max(Date.now(), (current?.deletedAt ?? 0) + 1) });
   await tx.done;
 }
+
 export async function listFavorites(): Promise<FavoriteItem[]> {
   const db = await getDatabase();
   return (await db.getAllFromIndex('favorites', 'by-createdAt')).reverse();
@@ -265,6 +266,7 @@ export async function listSyncTombstones(): Promise<SyncTombstone[]> {
   const db = await getDatabase();
   return db.getAll('sync-tombstones');
 }
+
 export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void> {
   const db = await getDatabase();
   const tx = db.transaction('sync-tombstones', 'readwrite');
@@ -275,6 +277,7 @@ export async function saveSyncTombstone(tombstone: SyncTombstone): Promise<void>
   }
   await tx.done;
 }
+
 export async function importBackupData(
   importedHistory: ResultHistoryItem[],
   importedFavorites: FavoriteItem[],
@@ -378,3 +381,4 @@ export async function importBackupData(
     throw error;
   }
 }
+
