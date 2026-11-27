@@ -75,8 +75,11 @@ function getDatabase() {
         db.createObjectStore('sync-tombstones', { keyPath: 'key' });
       }
       // v5: stopwatch removed — drop its store (and all saved stopwatch records) on upgrade.
-      if (oldVersion < 5 && db.objectStoreNames.contains('stopwatch-records')) {
-        db.deleteObjectStore('stopwatch-records');
+      // 'stopwatch-records' is intentionally no longer in HToolsDB, so cast it once
+      // for the typed idb API; runtime behaviour is unchanged.
+      const legacyStopwatchStore = 'stopwatch-records' as unknown as keyof HToolsDB;
+      if (oldVersion < 5 && db.objectStoreNames.contains(legacyStopwatchStore)) {
+        db.deleteObjectStore(legacyStopwatchStore);
       }
     },
   });
